@@ -33,7 +33,7 @@ public:
     }
 
     void send(const uint8_t *bytes, size_t length, int timeout) override {
-        std::cout << "Send data" << std::endl;
+        //std::cout << "Send data" << std::endl;
 
         pollfd pfd = { .fd = fd, .events = POLLOUT };
         int pr = poll(&pfd, 1, timeout);
@@ -72,7 +72,7 @@ public:
             throw Channel::IoError("Read error");
         }
 
-        std::cout << "Received data" << std::endl;
+        //std::cout << "Received data" << std::endl;
 
         return (size_t)rr;
     }

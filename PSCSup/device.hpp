@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <vector>
 #include <memory>
 #include <atomic>
@@ -7,6 +8,10 @@
 #include <thread>
 #include <cstring>
 #include <cassert>
+#include <random>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
 
 #include <utils/slice.hpp>
 #include <utils/panic.hpp>
@@ -15,7 +20,7 @@
 #include <../common/proto.h>
 
 
-#define TIMEOUT 10 // ms
+#define TIMEOUT 1000 // ms
 
 
 class Device {
@@ -82,37 +87,149 @@ private:
         return orig_size - size;
     }
 
+    class Stat {
+    public:
+        double m2 = 0.0;
+        uint64_t count = 0;
+        double mean = 0.0;
+        double var = 0.0;
+        double min = -1.0;
+        double max = -1.0;
+        void update(double rate) {
+            count += 1;
+            double delta = rate - mean;
+            mean += delta/count;
+            double delta2 = rate - mean;
+            m2 += delta*delta2;
+
+            var = sqrt(m2/(count - 1));
+
+            if (min < 0.0 || rate < min) {
+                min = rate;
+            }
+            if (rate > max) {
+                max = rate;
+            }
+        }
+    };
+
+    static std::string format_rate(double rate) {
+        static const char PREFS[] = "KMGT"; 
+        std::string pref = "";
+        for (size_t i = 0; i < sizeof(PREFS) - 1; ++i) {
+            if (rate >= 1e3) {
+                rate /= 1e3;
+                pref = PREFS[i];
+            } else {
+                break;
+            }
+        }
+        std::stringstream ss;
+        ss << std::fixed << std::setprecision(3) << rate << " " << pref;
+        return ss.str();
+    }
+
+    template <int P, int N, int L>
+    class Data {
+    public:
+        std::minstd_rand rng;
+        uint8_t send[P][N][L];
+        uint8_t recv[P][N][L];
+
+        void prepare() {
+            for (int k = 0; k < P; ++k) {
+                for (int j = 0; j < N; ++j) {
+                    for (int i = 0; i < L; ++i) {
+                        send[k][j][i] = uint8_t(255*(double(rng())/std::minstd_rand::max()));
+                    }
+                }
+            }
+        }
+
+        bool exchange(Channel *channel) {
+            for (int k = 0; k < P; ++k) {
+                for (int j = 0; j < N; ++j) {
+                    channel->send(send[k][j], L, TIMEOUT);
+                }
+                for (int j = 0; j < N; ++j) {
+                    int l = channel->receive(recv[k][j], L, TIMEOUT);
+                    if (l != L) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        bool check() const {
+            bool equal = true;
+            for (int k = 0; k < P; ++k) {
+                for (int j = 0; j < N; ++j) {
+                    for (int i = 0; i < L; ++i) {
+                        equal = equal && (send[k][j][i] == recv[k][j][i]);
+                    }
+                }
+            }
+            return equal;
+        }
+    };
+
     void serve_loop() {
         try {
             std::cout << "[ioc] Channel serve thread started" << std::endl;
             
-            uint8_t start_sid = PSCA_START;
-            channel->send(&start_sid, 1, -1); // Wait forever
+            std::minstd_rand rng;
+
+            static const int NPASS = 64, NBUFS = 8, LEN = 256;
+            Data<NPASS, NBUFS, LEN> data;
+
+            uint64_t bits_sent = 0;
+            double secs_elapsed = 0.0;
+
+            const double print_period = 2.0; // sec
+            Stat stat;
 
             while(!this->done.load()) {
-                size_t size = 0;
-                try {
-                    size = channel->receive(recv_buffer.data(), recv_buffer.size(), TIMEOUT);
-                } catch (const Channel::TimedOut &e) {
-                    continue;
+                data.prepare();
+
+
+                auto start = std::chrono::steady_clock::now();
+
+                if (!data.exchange(&*channel)) {
+                    throw Exception("Bad length of received data");
                 }
 
-                uint8_t cmd = recv_buffer[0];
-                std::cout << "Received command: 0x" << std::hex << int(cmd) << std::dec << std::endl;
+                auto stop = std::chrono::steady_clock::now();
 
-                if(cmd == PSCM_WF_REQ) {
-                    if (size != 1) {
-                        throw Exception("Bad size of PSCM_WF_REQ command");
+                if (!data.check()) {
+                    throw Exception("Bad content of received data");
+                }
+
+                uint64_t bits = NPASS*NBUFS*2*LEN*8;
+                double time = 1e-3*std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+
+                stat.update(bits/time);
+
+                bits_sent += bits;
+                secs_elapsed += time;
+
+                if (secs_elapsed > print_period) {
+                    std::cout << std::endl;
+                    std::array<std::pair<std::string, double>, 4> par = {
+                        std::make_pair("avg", stat.mean),
+                        std::make_pair("var", stat.var),
+                        std::make_pair("min", stat.min),
+                        std::make_pair("max", stat.max),
+                    };
+                    for (auto p : par) {
+                        std::cout << p.first << ": " << format_rate(p.second) << "bps" << std::endl;
                     }
-                    send_buffer[0] = PSCA_WF_DATA; 
-                    size_t shift = 1;
-                    size_t msg_size = fill_until_full(
-                        send_buffer.data() + shift,
-                        send_buffer.size() - shift
-                    ) + shift;
-                    channel->send(send_buffer.data(), msg_size, TIMEOUT);
-                } else {
-                    throw Exception("Unknown PSCM command: " + std::to_string(cmd));
+
+                    double rate = bits_sent/secs_elapsed;
+                    std::cout << "Currnet data rate: " << format_rate(rate) << "bits per second" << std::endl;
+                    
+                    bits_sent = 0;
+                    secs_elapsed = 0.0;
                 }
             }
         } catch(const Exception &e) {
