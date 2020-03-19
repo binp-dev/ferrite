@@ -122,5 +122,6 @@ class Ioc(Component):
             self.manage(["test", "--tests", "integration"], "test/integration")
         if self.device is not None:
             self.deploy()
-            self.reboot()
+            if not self.args["no_reboot"]:
+                self.reboot()
             self.run_ioc()

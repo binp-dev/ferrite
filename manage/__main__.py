@@ -254,6 +254,10 @@ class TestHandler(DeployHandler):
             "--no-local", action="store_true",
             help="Does not perform local testing.",
         )
+        parser.add_argument(
+            "--no-reboot", action="store_true",
+            help="Does not reboot SoC (will not reload M4 image).",
+        )
         return parser
     
     def _handle_args(self, args):
