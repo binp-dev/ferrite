@@ -68,14 +68,16 @@ uint8_t APP_RPMSG_Init() {
 
 
     if (rpmsg_rtos_init(0 /*REMOTE_CPU_ID*/, &rdev, RPMSG_MASTER, &app_chnl) != 0) {
-        APP_ERROR("Cannot initialize RPMSG");
+        //APP_ERROR("Cannot initialize RPMSG");
         goto rpmsg_deinit;
     }
 
+    /*
     APP_INFO(
-        "Name service handshake is done, M4 has setup a rpmsg channel [%d ---> %d]",
+        "Name service handshake is done, M4 has setup a rpmsg channel [%ld ---> %ld]",
         app_chnl->src, app_chnl->dst
     );
+    */
 
     return 0;
 

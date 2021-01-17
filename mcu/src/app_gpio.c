@@ -32,7 +32,6 @@
 #include <stdint.h>
 
 #include "board.h"
-#include "debug_console_imx.h"
 #include "pin_mux.h"
 #include "gpio_pins.h"
 #include "gpio_imx.h"

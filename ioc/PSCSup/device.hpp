@@ -98,11 +98,13 @@ private:
                 }
 
                 uint8_t cmd = recv_buffer[0];
-                std::cout << "Received command: 0x" << std::hex << int(cmd) << std::dec << std::endl;
+                size_t cmd_len = recv_buffer[1];
+                std::cout << "Received command: 0x" << std::hex << int(cmd) << std::dec
+                          << ", size: " << size << std::endl;
 
                 if(cmd == PSCM_WF_REQ) {
-                    if (size != 1) {
-                        throw Exception("Bad size of PSCM_WF_REQ command");
+                    if (size != 2 || cmd_len != 0) {
+                        throw Exception("Bad size of PSCM_WF_REQ command: " + std::to_string(size));
                     }
                     send_buffer[0] = PSCA_WF_DATA; 
                     size_t shift = 1;
@@ -112,8 +114,9 @@ private:
                     ) + shift;
                     channel->send(send_buffer.data(), msg_size, TIMEOUT);
                 } else if (cmd == PSCM_MESSAGE) {
-                    uint8_t len = recv_buffer[1];
-                    std::cout << "Message(" << int(len) << "): " << recv_buffer.data() + 2 << std::endl;
+                    std::cout << "Message(" << (size - 2) << "): "
+                        << std::string((const char *)recv_buffer.data() + 2, cmd_len)
+                        << std::endl;
                 } else {
                     throw Exception("Unknown PSCM command: " + std::to_string(cmd));
                 }
@@ -163,6 +166,7 @@ public:
     }
 
     void set_waveform(const_slice<double> waveform) {
+        std::cout << "Device::set_waveform" << std::endl;
         assert(waveform.size() <= max_points());
         if (!swap_ready.load()) {
             std::copy(waveform.begin(), waveform.end(), waveforms[1].begin());

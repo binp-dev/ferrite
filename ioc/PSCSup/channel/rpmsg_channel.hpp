@@ -15,6 +15,10 @@ private:
     int fd;
     struct termios tty;
 
+    static const size_t BUF_LEN = 0x100;
+    uint8_t recv_buffer[BUF_LEN];
+    size_t recv_pos = 0, recv_len = 0;
+
 public:
     RpmsgChannel(const std::string &dev) {
         std::cout << "Init RPMSG channel: " << dev << std::endl;
@@ -32,6 +36,7 @@ public:
         close(fd);
     }
 
+    // TODO: Buffered send
     void send(const uint8_t *bytes, size_t length, int timeout) override {
         std::cout << "Send data" << std::endl;
 
@@ -55,25 +60,35 @@ public:
         }
     }
     size_t receive(uint8_t *bytes, size_t max_length, int timeout) override {
-        pollfd pfd = { .fd = fd, .events = POLLIN };
-        int pr = poll(&pfd, 1, timeout);
-        if (pr > 0) {
-            if (!(pfd.revents & POLLIN)) {
-                throw Channel::IoError("Poll bad event");
+        if (recv_pos >= recv_len) {
+            pollfd pfd = { .fd = fd, .events = POLLIN };
+            int pr = poll(&pfd, 1, timeout);
+            if (pr > 0) {
+                if (!(pfd.revents & POLLIN)) {
+                    throw Channel::IoError("Poll bad event");
+                }
+            } else if (pr == 0) {
+                throw Channel::TimedOut();
+            } else {
+                throw Channel::IoError("Poll error");
             }
-        } else if (pr == 0) {
-            throw Channel::TimedOut();
-        } else {
-            throw Channel::IoError("Poll error");
+
+            int rr = read(fd, recv_buffer, BUF_LEN);
+            if (rr <= 0) {
+                throw Channel::IoError("Read error");
+            }
+
+            std::cout << "Received data { len: " << rr << " }" << std::endl;
+            recv_len = rr;
+            recv_pos = 0;
         }
 
-        int rr = read(fd, bytes, max_length);
-        if (rr <= 0) {
-            throw Channel::IoError("Read error");
-        }
+        bytes[0] = recv_buffer[recv_pos];
+        bytes[1] = recv_buffer[recv_pos + 1];
+        size_t msg_len = recv_buffer[recv_pos + 1];
+        memcpy(bytes + 2, recv_buffer + recv_pos + 2, std::min(std::min(msg_len, recv_len - recv_pos - 2), max_length));
+        recv_pos += msg_len + 2;
 
-        std::cout << "Received data" << std::endl;
-
-        return (size_t)rr;
+        return msg_len + 2;
     }
 };

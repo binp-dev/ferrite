@@ -31,7 +31,7 @@
 #include "board.h"
 #include "pin_mux.h"
 
-#include "app_flexcan.h"
+#include "app_ecspi.h"
 #include "app_gpt.h"
 #include "app_rpmsg.h"
 
@@ -52,6 +52,9 @@ void hardware_init(void)
 
     /* Initialize GPT hardware */
     APP_GPT_HardwareInit();
+
+    /* Initialize ECSPI hardware */
+    APP_ECSPI_HardwareInit();
 }
 
 /*******************************************************************************
