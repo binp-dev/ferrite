@@ -71,14 +71,14 @@ static void APP_Task_Rpmsg(void *param) {
 
     xTaskCreate(
         APP_Task_EcspiTransfer, "ECSPI task",
-        APP_TASK_STACK_SIZE, NULL, tskIDLE_PRIORITY + 3, NULL
+        APP_TASK_STACK_SIZE, NULL, tskIDLE_PRIORITY + 2, NULL
     );
 
     APP_INFO("Start GPT");
     APP_GPT_Init(APP_GPT_SEC/10, wf_send_sem);
 
+    APP_INFO("Enter RPMSG read loop");
     while(true) {
-        APP_INFO("Enter RPMSG read loop");
         uint32_t len = 0;
         uint8_t *buffer = wf_buffers[!wf_current];
         // FIXME: Avoid buffer switching while receiving data.
@@ -89,8 +89,6 @@ static void APP_Task_Rpmsg(void *param) {
             ASSERT(len == APP_WF_BUF_SIZE);
             ASSERT(buffer[0] == PSCA_WF_DATA);
             xSemaphoreGive(wf_ready_sem);
-            APP_INFO("RPMSG: [%ld]\r\n", len);
-            //APP_Print_Bytes(buffer, len);
         } else {
             PANIC_("RPMSG receive error");
         }
@@ -123,7 +121,9 @@ static void APP_Task_EcspiTransfer(void *param) {
             pos = APP_WF_OFFSET;
         }
 
+        APP_INFO("Waiting for timer");
         ASSERT(xSemaphoreTake(wf_send_sem, portMAX_DELAY) == pdTRUE);
+        APP_INFO("Sending");
 
         // FIXME: Use driver
         spi_tx[0] = 0xE0;
@@ -135,12 +135,12 @@ static void APP_Task_EcspiTransfer(void *param) {
         pos += APP_WF_POINT_SIZE;
 
         if (APP_ECSPI_Transfer(spi_tx, spi_rx, APP_SPI_TX_SIZE, APP_FOREVER_MS) != 0) {
-            PANIC_("Cannot send CAN frame");
+            PANIC_("Cannot send ECSPI message");
         }
         PRINTF("SPI Write: TX: [");
-        APP_Print_Bytes(spi_tx, APP_SPI_TX_SIZE);
+        //APP_Print_Bytes(spi_tx, APP_SPI_TX_SIZE);
         PRINTF("], RX: [");
-        APP_Print_Bytes(spi_rx, APP_SPI_TX_SIZE);
+        //APP_Print_Bytes(spi_rx, APP_SPI_TX_SIZE);
         PRINTF("]\r\n");
 
         // FIXME: Use driver
@@ -152,12 +152,12 @@ static void APP_Task_EcspiTransfer(void *param) {
         );
 
         if (APP_ECSPI_Transfer(spi_tx, spi_rx, APP_SPI_TX_SIZE, APP_FOREVER_MS) != 0) {
-            PANIC_("Cannot send CAN frame");
+            PANIC_("Cannot send ECSPI message");
         }
         PRINTF("SPI Read: TX: [");
-        APP_Print_Bytes(spi_tx, APP_SPI_TX_SIZE);
+        //APP_Print_Bytes(spi_tx, APP_SPI_TX_SIZE);
         PRINTF("], RX: [");
-        APP_Print_Bytes(spi_rx, APP_SPI_TX_SIZE);
+        //APP_Print_Bytes(spi_rx, APP_SPI_TX_SIZE);
         PRINTF("]\r\n");
 
         if (buf != NULL) {
@@ -182,7 +182,7 @@ int main(void) {
     /* Create tasks. */
     xTaskCreate(
         APP_Task_Rpmsg, "RPMSG task",
-        APP_TASK_STACK_SIZE, NULL, tskIDLE_PRIORITY + 2, NULL
+        APP_TASK_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL
     );
 
     /* Start FreeRTOS scheduler. */

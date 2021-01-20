@@ -3,6 +3,7 @@
 #include "app_log.h"
 
 
+#define APP_ECSPI_IRQ_PRIORITY     3
 #define APP_FLEXCAN_IRQ_PRIORITY   3
 #define APP_GPT_IRQ_PRIORITY       3
 #define APP_MU_IRQ_PRIORITY        3

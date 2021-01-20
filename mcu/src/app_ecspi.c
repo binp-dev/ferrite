@@ -225,6 +225,8 @@ static void _ECSPI_Config(ecspi_init_config_t* initConfig) {
     /* Initialize ECSPI, parameter configure */
     ECSPI_Init(BOARD_ECSPI_MASTER_BASEADDR, initConfig);
 
+    /* Set ECSPI interrupt priority. */
+    NVIC_SetPriority(BOARD_ECSPI_MASTER_IRQ_NUM, APP_ECSPI_IRQ_PRIORITY);
     /* Call core API to enable the IRQ. */
     NVIC_EnableIRQ(BOARD_ECSPI_MASTER_IRQ_NUM);
 }
