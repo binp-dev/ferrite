@@ -1,21 +1,21 @@
 import re
 
-redef = re.compile("^#define\s+(\S+)\s+(.*)$")
-recom = [re.compile("/\*.*\*/"), re.compile("//.*$")]
+_REDEF = re.compile("^#define\s+(\S+)\s+(.*)$")
+_RECOM = [re.compile("/\*.*\*/"), re.compile("//.*$")]
 
-def remove_comments(line):
-    for rec in recom:
+def _remove_comments(line):
+    for rec in _RECOM:
         line = re.sub(rec, "", line)
     return line
 
-def read_defines(path):
+def read_definitions(path):
     pairs = {}
     for l in open(path, "r"):
         l = l.strip()
-        m = re.search(redef, l)
+        m = re.search(_REDEF, l)
 
         if m is not None:
-            v = remove_comments(m.group(2)).strip()
+            v = _remove_comments(m.group(2)).strip()
             try:
                 v = int(v, 0)
             except ValueError:
