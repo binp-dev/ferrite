@@ -4,5 +4,7 @@ test:
   stage: test
   only:
     - merge_requests
+  before_script:
+    - pip3 install zmq
   script:
-    - python3 ci/test.py
+    - python3 -m ci.test
