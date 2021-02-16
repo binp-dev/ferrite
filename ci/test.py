@@ -1,38 +1,57 @@
 import multiprocessing
 import zmq
+from subprocess import Popen
+import time
 
+class Bash:
+    def __init__(self):
+        self.proc = None
 
-addr = "tcp://127.0.0.1:5678"
+    def __enter__(self):
+        self.proc = Popen(
+            ["/usr/bin/env", "bash"],
+            text=True
+        )
+        time.sleep(1)
+        print("ioc '%s' started")
 
+    def __exit__(self, *args):
+        print("terminating '%s' ...")
+        self.proc.terminate()
+        print("ioc '%s' terminated")
 
-def ping():
-    """Sends ping requests and waits for replies."""
-    context = zmq.Context()
-    sock = context.socket(zmq.REQ)
-    sock.bind(addr)
+class Pong:
+    def __init__(self):
+        self.proc = None
 
-    for i in range(5):
-        sock.send_unicode("ping %s" % i)
-        rep = sock.recv_unicode()  # This blocks until we get something
-        print("Ping got reply:", rep)
+    def pong(self):
+        context = zmq.Context()
+        sock = context.socket(zmq.PAIR)
+        sock.connect("tcp://127.0.0.1:8321")
 
+        for i in range(5):
+            req = sock.recv()
+            print('Pong got request:', req)
+            sock.send_unicode('pong %s' % i)
 
-def pong():
-    """Waits for ping requests and replies with a pong."""
-    context = zmq.Context()
-    sock = context.socket(zmq.REP)
-    sock.connect(addr)
+    def __enter__(self):
+        self.proc = multiprocessing.Process(target=self.pong)
+        self.proc.start()
 
-    for i in range(5):
-        req = sock.recv_unicode()  # This also blocks
-        print("Pong got request:", req)
-        sock.send_unicode("pong %s" % i)
-
+    def __exit__(self, *args):
+        self.proc.join()
+        print('Pong joined')
 
 if __name__ == "__main__":
-    pong_proc = multiprocessing.Process(target=pong)
-    pong_proc.start()
+    context = zmq.Context()
+    sock = context.socket(zmq.PAIR)
+    sock.bind("tcp://127.0.0.1:8321")
 
-    ping()
+    with Bash(), Pong():
 
-    pong_proc.join()
+        for i in range(5):
+            sock.send_unicode('ping %s' % i)
+            rep = sock.recv_unicode()
+            print('Ping got reply:', rep)
+
+        print("Success")
