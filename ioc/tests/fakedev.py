@@ -40,6 +40,7 @@ def run_test(
     arch,
 ):
     global IDS
+    print("Running tests")
 
     ioc = Ioc(
         os.path.join(ioc_dir, "bin", arch, "PSC"),
@@ -56,39 +57,48 @@ def run_test(
         return bytes([id])
 
     wfs = 200
-    with ca.Repeater(prefix), ioc:
-        start_msg = socket.recv()
-        assert(int(start_msg[0]) == IDS["PSCA_START"])
-        assert(int(start_msg[1]) == 0)
-        print("Received start signal")
+    print("Starting caRepeater ...")
+    with ca.Repeater(prefix):
+        print("Starting IOC ...")
+        with ioc:
+            print("Testing ...")
 
-        socket.send(encode(IDS["PSCM_MESSAGE"], "Hello from MCU!".encode("utf-8")))
+            start_msg = socket.recv()
+            assert(int(start_msg[0]) == IDS["PSCA_START"])
+            assert(int(start_msg[1]) == 0)
+            print("Received start signal")
 
-        queue = [0]*wfs*2
-        for _ in range(4):
-            socket.send(encode(IDS["PSCM_WF_REQ"]))
-            queue = assert_pop(queue, decode_wf_data(socket.recv()))
-        
-        wf = list(range(wfs))
-        ca.put(prefix, "WAVEFORM", wf, array=True)
-        queue += wf*2
-        for _ in range(5):
-            socket.send(encode(IDS["PSCM_WF_REQ"]))
-            queue = assert_pop(queue, decode_wf_data(socket.recv()))
+            socket.send(encode(IDS["PSCM_MESSAGE"], "Hello from MCU!".encode("utf-8")))
 
-        wf = [wfs - x - 1 for x in range(wfs)]
-        ca.put(prefix, "WAVEFORM", wf, array=True)
-        queue += wf*2
-        for _ in range(5):
-            socket.send(encode(IDS["PSCM_WF_REQ"]))
-            queue = assert_pop(queue, decode_wf_data(socket.recv()))
+            queue = [0]*wfs*2
+            for _ in range(4):
+                socket.send(encode(IDS["PSCM_WF_REQ"]))
+                queue = assert_pop(queue, decode_wf_data(socket.recv()))
+            
+            wf = list(range(wfs))
+            ca.put(prefix, "WAVEFORM", wf, array=True)
+            queue += wf*2
+            for _ in range(5):
+                socket.send(encode(IDS["PSCM_WF_REQ"]))
+                queue = assert_pop(queue, decode_wf_data(socket.recv()))
 
-        wf = [wfs + x for x in range(wfs)]
-        ca.put(prefix, "WAVEFORM", range(0, 2*wfs, 2), array=True)
-        ca.put(prefix, "WAVEFORM", wf, array=True)
-        queue += wf*4
-        for _ in range(9):
-            socket.send(encode(IDS["PSCM_WF_REQ"]))
-            queue = assert_pop(queue, decode_wf_data(socket.recv()))
+            wf = [wfs - x - 1 for x in range(wfs)]
+            ca.put(prefix, "WAVEFORM", wf, array=True)
+            queue += wf*2
+            for _ in range(5):
+                socket.send(encode(IDS["PSCM_WF_REQ"]))
+                queue = assert_pop(queue, decode_wf_data(socket.recv()))
 
+            wf = [wfs + x for x in range(wfs)]
+            ca.put(prefix, "WAVEFORM", range(0, 2*wfs, 2), array=True)
+            ca.put(prefix, "WAVEFORM", wf, array=True)
+            queue += wf*4
+            for _ in range(9):
+                socket.send(encode(IDS["PSCM_WF_REQ"]))
+                queue = assert_pop(queue, decode_wf_data(socket.recv()))
+            
+            print("Testing complete")
+
+        print("Stopped IOC")
+    print("Stopped caRepeater")
     print("Test passed!")
