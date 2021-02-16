@@ -5,6 +5,6 @@ test:
   only:
     - merge_requests
   before_script:
-    - pip3 install zmq
+    - pip3 install -r requirements.txt
   script:
-    - python3 -m ci.test
+    - python3 -m manage all.test_host

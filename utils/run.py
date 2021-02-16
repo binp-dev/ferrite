@@ -11,7 +11,7 @@ def run(
     capture: bool = False,
     log: bool = True,
     **kwargs,
-) -> str:
+):
     if log:
         logging.debug(f"run({cmd}, {kwargs})")
     env = dict(os.environ)
