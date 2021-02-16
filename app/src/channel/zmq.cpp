@@ -51,7 +51,9 @@ Result<std::monostate, ZmqChannel::Error> ZmqChannel::send(
 ) {
     zmq_pollitem_t pollitem = {this->socket_.get(), 0, ZMQ_POLLOUT, 0};
     // Handle timeout error separately
+    std::cout << "[app] ZMQ polling send ..." << std::endl;
     if (!timeout || zmq_poll(&pollitem, 1, timeout->count()) > 0) {
+        std::cout << "[app] ZMQ sending ..." << std::endl;
         if (zmq_send(this->socket_.get(), bytes, length, !timeout ? 0 : ZMQ_NOBLOCK) <= 0) {
             return Err(Error{ErrorKind::IoError, "Error send"});
         }
@@ -66,7 +68,9 @@ Result<size_t, ZmqChannel::Error> ZmqChannel::receive(
 ) {
     zmq_pollitem_t pollitem = {this->socket_.get(), 0, ZMQ_POLLIN, 0};
     // Handle timeout error separately
+    std::cout << "[app] ZMQ polling recv ..." << std::endl;
     if (!timeout || zmq_poll(&pollitem, 1, timeout->count()) > 0) {
+        std::cout << "[app] ZMQ receiving ..." << std::endl;
         int ret = zmq_recv(this->socket_.get(), bytes, max_length, !timeout ? 0 : ZMQ_NOBLOCK);
         if (ret <= 0) {
             return Err(Error{ErrorKind::IoError, "Error receive"});

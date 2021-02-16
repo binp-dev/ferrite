@@ -80,7 +80,7 @@ private:
 
     void serve_loop() {
         std::cout << "[ioc] Channel serve thread started" << std::endl;
-        auto timeout = std::chrono::milliseconds(10);
+        auto timeout = std::chrono::milliseconds(100);
         
         uint8_t start_msg[2] = {PSCA_START, 0};
         channel->send(start_msg, 2, std::nullopt).unwrap(); // Wait forever
