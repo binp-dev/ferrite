@@ -1,5 +1,6 @@
 #include "zmq.hpp"
 
+#include <iostream>
 #include <core/assert.hpp>
 
 
@@ -37,10 +38,10 @@ Result<ZmqChannel, ZmqChannel::Error> ZmqChannel::create(const std::string &host
     }
     auto socket = zmq_helper::guard_socket(raw_socket);
 
-    //std::cout << "ZmqChannel(host='" << host << "')" << std::endl;
     if (zmq_connect(socket.get(), host.c_str()) != 0) {
         return Err(Error{ErrorKind::IoError, "Error connecting ZMQ socket"});
     }
+    std::cout << "[app] ZMQ connected to " << host << std::endl;
 
     return Ok(ZmqChannel(host, std::move(context), std::move(socket)));
 }
@@ -54,6 +55,7 @@ Result<std::monostate, ZmqChannel::Error> ZmqChannel::send(
         if (zmq_send(this->socket_.get(), bytes, length, !timeout ? 0 : ZMQ_NOBLOCK) <= 0) {
             return Err(Error{ErrorKind::IoError, "Error send"});
         }
+        std::cout << "[app] ZMQ sent " << length << " bytes" << std::endl;
         return Ok(std::monostate{});
     } else {
         return Err(Error{ErrorKind::TimedOut, "Timed out send"});
@@ -69,6 +71,7 @@ Result<size_t, ZmqChannel::Error> ZmqChannel::receive(
         if (ret <= 0) {
             return Err(Error{ErrorKind::IoError, "Error receive"});
         }
+        std::cout << "[app] ZMQ received " << ret << " bytes" << std::endl;
         return Ok<size_t>(ret);
     } else {
         return Err(Error{ErrorKind::TimedOut, "Timed out receive"});
