@@ -12,9 +12,10 @@ int main(int argc,char *argv[])
 {
     if(argc>=2) {
         iocsh(argv[1]);
-        epicsThreadSleep(.2);
+        epicsThreadSleep(60.0);
+    } else {
+        iocsh(NULL);
     }
-    iocsh(NULL);
     epicsExit(0);
     return(0);
 }
