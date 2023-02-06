@@ -90,6 +90,7 @@ class Cargo(Component):
     rustc: Rustc
     deps: List[Task] = field(default_factory=list)
     features: List[str] = field(default_factory=list)
+    default_features: bool = True
     release: bool = False
 
     def __post_init__(self) -> None:
@@ -126,6 +127,7 @@ class Cargo(Component):
                 "build",
                 f"--target={self.rustc.target}",
                 f"--features={','.join(self.features)}",
+                *(["--no-default-features"] if not self.default_features else []),
                 *(["--release"] if self.release else []),
             ],
         ]
@@ -138,6 +140,7 @@ class Cargo(Component):
                 "cargo",
                 "test",
                 f"--features={','.join(self.features)}",
+                *(["--no-default-features"] if not self.default_features else []),
                 #"--",
                 #"--nocapture",
             ],

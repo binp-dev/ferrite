@@ -72,7 +72,7 @@ class McuBase(Cmake):
         ]
 
 
-@dataclass
+@dataclass(eq=False)
 class _DeployTask(OwnedTask[McuBase]):
     deployer: McuDeployer
 

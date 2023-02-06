@@ -16,12 +16,14 @@ class IocRemoteRunner:
     def __init__(
         self,
         device: Device,
+        name: str,
         deploy_path: PurePosixPath,
         epics_deploy_path: PurePosixPath,
         arch: str,
     ):
         super().__init__()
         self.device = device
+        self.name = name
         self.deploy_path = deploy_path
         self.epics_deploy_path = epics_deploy_path
         self.arch = arch
@@ -39,8 +41,8 @@ class IocRemoteRunner:
                 "export {}; export {}; cd {} && {} {}".format(
                     f"TOP={self.deploy_path}",
                     "LD_LIBRARY_PATH={}".format(":".join(map(str, lib_dirs))),
-                    f"{self.deploy_path}/iocBoot/iocFer",
-                    f"{self.deploy_path}/bin/{self.arch}/Fer",
+                    f"{self.deploy_path}/iocBoot/ioc{self.name}",
+                    f"{self.deploy_path}/bin/{self.arch}/{self.name}",
                     "st.cmd",
                 ),
             ],

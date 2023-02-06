@@ -39,6 +39,10 @@ class AbstractIoc(EpicsProject[Gcc], Generic[B]):
         return self._install_task
 
     @property
+    def name(self) -> str:
+        raise NotImplementedError()
+
+    @property
     def arch(self) -> str:
         return self.epics_base.arch
 
@@ -184,6 +188,7 @@ class _CrossRunTask(OwnedTask[Co]):
         assert isinstance(self.owner.epics_base, EpicsBaseCross)
         with IocRemoteRunner(
             ctx.device,
+            self.owner.name,
             self.owner.deploy_path,
             self.owner.epics_base.deploy_path,
             self.owner.epics_base.arch,
