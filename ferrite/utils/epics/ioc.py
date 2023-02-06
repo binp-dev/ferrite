@@ -23,14 +23,15 @@ class IocBase:
 
     def __init__(
         self,
+        name: str,
         epics_base_dir: Path,
         ioc_dir: Path,
         arch: str,
         env: Dict[str, str] = {},
         mode: RunMode = RunMode.NORMAL,
     ):
-        self.binary = ioc_dir / "bin" / arch / "Fer"
-        self.script = ioc_dir / "iocBoot/iocFer/st.cmd"
+        self.binary = ioc_dir / "bin" / arch / name
+        self.script = ioc_dir / f"iocBoot/ioc{name}/st.cmd"
         self.lib_dirs = [epics_base_dir / "lib" / arch, ioc_dir / "lib" / arch]
         self._env = env
         self.mode = mode
