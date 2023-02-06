@@ -23,19 +23,10 @@ class AbstractIoc(EpicsProject[Gcc], Generic[B]):
     def BuildTask(self) -> AbstractBuildTask[AbstractIoc[B]]:
         raise NotImplementedError()
 
-    def __init__(self, ioc_dirs: List[Path], target_dir: TargetPath, epics_base: B):
-        src_dir: Path | TargetPath
-        assert len(ioc_dirs) > 0
-        if len(ioc_dirs) == 1:
-            src_dir = ioc_dirs[0]
-        else:
-            # Create separate source dir
-            src_dir = target_dir / f"src"
-
-        super().__init__(src_dir, target_dir, epics_base.cc.name)
+    def __init__(self, ioc_dir: Path, target_dir: TargetPath, epics_base: B):
+        super().__init__(ioc_dir, target_dir, epics_base.cc.name)
 
         self.epics_base = epics_base
-        self.ioc_dirs = ioc_dirs
         self._build_task = self.BuildTask()
         self._install_task = AbstractInstallTask(self)
 
@@ -57,8 +48,8 @@ class IocHost(AbstractIoc[EpicsBaseHost]):
     def BuildTask(self) -> HostBuildTask[IocHost]:
         return HostBuildTask(self)
 
-    def __init__(self, ioc_dirs: List[Path], target_dir: TargetPath, epics_base: EpicsBaseHost):
-        super().__init__(ioc_dirs, target_dir, epics_base)
+    def __init__(self, ioc_dir: Path, target_dir: TargetPath, epics_base: EpicsBaseHost):
+        super().__init__(ioc_dir, target_dir, epics_base)
 
     @property
     def cc(self) -> GccHost:
@@ -77,8 +68,8 @@ class IocCross(AbstractIoc[EpicsBaseCross]):
             self.epics_base.deploy_path,
         )
 
-    def __init__(self, ioc_dirs: List[Path], target_dir: TargetPath, epics_base: EpicsBaseCross):
-        super().__init__(ioc_dirs, target_dir, epics_base)
+    def __init__(self, ioc_dir: Path, target_dir: TargetPath, epics_base: EpicsBaseCross):
+        super().__init__(ioc_dir, target_dir, epics_base)
 
         self.deploy_path = PurePosixPath("/opt/ioc")
 
@@ -97,17 +88,6 @@ class AbstractBuildTask(EpicsBuildTask[O]):
 
     def __init__(self, owner: O):
         super().__init__(owner, clean=True)
-
-    def _prepare_source(self, ctx: Context) -> None:
-        if len(self.owner.ioc_dirs) == 1:
-            # There is no patches
-            return
-
-        for ioc_dirs in self.owner.ioc_dirs:
-            shutil.copytree(ioc_dirs, ctx.target_path / self.owner.src_dir, dirs_exist_ok=True)
-
-    def _dep_paths(self, ctx: Context) -> List[Path]:
-        return self.owner.ioc_dirs
 
     def _configure(self, ctx: Context) -> None:
         build_path = ctx.target_path / self.owner.build_dir
@@ -132,7 +112,6 @@ class AbstractBuildTask(EpicsBuildTask[O]):
         assert isinstance(self.owner.src_dir, TargetPath)
         return [
             *super().artifacts(),
-            *([Artifact(self.owner.src_dir)] if len(self.owner.ioc_dirs) > 1 else []),
             Artifact(self.owner.install_dir), # Because IOC install is performed during build
         ]
 

@@ -16,8 +16,8 @@ from ferrite.info import path as self_path
 
 class AppIoc(AbstractIoc[B]):
 
-    def __init__(self, ioc_dirs: List[Path], target_dir: TargetPath, epics_base: B, app: AppBase):
-        super().__init__([self_path / "source/ioc", *ioc_dirs], target_dir, epics_base)
+    def __init__(self, ioc_dir: Path, target_dir: TargetPath, epics_base: B, app: AppBase):
+        super().__init__(ioc_dir, target_dir, epics_base)
         self.app = app
 
 
