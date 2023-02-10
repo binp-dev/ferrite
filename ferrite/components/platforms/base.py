@@ -11,6 +11,7 @@ from ferrite.components.rust import RustcCross
 @dataclass
 class McuPlatform:
     gcc: GccCross
+    rustc: RustcCross
     freertos: Freertos
     deployer: McuDeployer
 

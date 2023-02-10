@@ -7,7 +7,7 @@ from ferrite.components.freertos import Freertos
 from ferrite.components.platforms.base import McuPlatform, Platform
 from ferrite.components.compiler import Target, GccCross
 from ferrite.components.mcu import McuDeployer
-from ferrite.components.platforms.arm import Aarch64AppPlatform
+from ferrite.components.platforms.arm import Aarch64AppPlatform, ArmMcuRustc
 from ferrite.remote.base import Device
 
 
@@ -51,7 +51,8 @@ class Imx8mnMcuDeployer(McuDeployer):
 class Imx8mnPlatform(Platform):
 
     def __init__(self) -> None:
+        gcc = Imx8mnMcuToolchain()
         super().__init__(
-            McuPlatform(Imx8mnMcuToolchain(), Imx8mnFreertos(), Imx8mnMcuDeployer()),
+            McuPlatform(gcc, ArmMcuRustc("m7", gcc), Imx8mnFreertos(), Imx8mnMcuDeployer()),
             Imx8mnAppPlatform(),
         )

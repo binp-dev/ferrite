@@ -61,3 +61,9 @@ class Aarch64AppPlatform(AppPlatform):
     def __init__(self, name: str) -> None:
         gcc = Aarch64AppToolchain(name)
         super().__init__(gcc, Aarch64AppRustc(name, gcc))
+
+
+class ArmMcuRustc(RustcCross):
+
+    def __init__(self, postfix: str, gcc: GccCross):
+        super().__init__(postfix, Target.from_str("thumbv7em-none-eabihf"), gcc)
