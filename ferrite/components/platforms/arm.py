@@ -66,4 +66,4 @@ class Aarch64AppPlatform(AppPlatform):
 class ArmMcuRustc(RustcCross):
 
     def __init__(self, postfix: str, gcc: GccCross):
-        super().__init__(postfix, Target.from_str("thumbv7em-none-eabihf"), gcc)
+        super().__init__(postfix, Target.from_str("thumbv7em-none-eabihf"), gcc, toolchain="beta")

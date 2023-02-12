@@ -13,11 +13,12 @@ from ferrite.components.compiler import Compiler, Gcc, GccCross, GccHost, Target
 
 class Rustc(Compiler):
 
-    def __init__(self, postfix: str, target: Target, cc: Gcc):
+    def __init__(self, postfix: str, target: Target, cc: Gcc, toolchain: str = None):
         self._install_task = _RustcInstallTask(self)
         super().__init__(f"rustc_{postfix}", target, cached=True)
         self.path = TargetPath("rustup")
         self._cc = cc
+        self.toolchain = "stable" if toolchain is None else toolchain
 
     @property
     def install_task(self) -> _RustcInstallTask:
@@ -30,14 +31,14 @@ class Rustc(Compiler):
     def env(self, ctx: Context) -> Dict[str, str]:
         return {
             **({"RUSTUP_HOME": str(ctx.target_path / self.path)} if ctx.local else {}),
-            "RUSTUP_TOOLCHAIN": "stable",
+            "RUSTUP_TOOLCHAIN": self.toolchain,
         }
 
     def install(self, ctx: Context) -> None:
         cmds = [
             ["rustup", "set", "profile", "minimal"],
             ["rustup", "target", "add", str(self.target)],
-            *([] if not ctx.update else [["rustup", "update", "--force-non-host", f"stable-{self.target}"]]),
+            *([] if not ctx.update else [["rustup", "update", "--force-non-host", f"{self.toolchain}-{self.target}"]]),
         ]
         for cmd in cmds:
             run(cmd, add_env=self.env(ctx), quiet=ctx.capture)
@@ -56,19 +57,19 @@ class RustcHost(Rustc):
 
     _target_pattern: re.Pattern[str] = re.compile(r"^Default host:\s+(\S+)$", re.MULTILINE)
 
-    def __init__(self, cc: GccHost):
+    def __init__(self, cc: GccHost, toolchain: str = None):
         info = capture(["rustup", "show"])
         match = re.search(self._target_pattern, info)
         assert match is not None, f"Cannot detect rustup host rustc:\n{info}"
         target = Target.from_str(match[1])
-        super().__init__("host", target, cc)
+        super().__init__("host", target, cc, toolchain=toolchain)
 
 
 class RustcCross(Rustc):
 
-    def __init__(self, postfix: str, target: Target, cc: GccCross):
+    def __init__(self, postfix: str, target: Target, cc: GccCross, toolchain: str = None):
         self._cc_cross = cc
-        super().__init__(postfix, target, cc)
+        super().__init__(postfix, target, cc, toolchain=toolchain)
 
     @property
     def cc(self) -> GccCross:
