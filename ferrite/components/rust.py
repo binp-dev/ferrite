@@ -167,13 +167,14 @@ class _CargoBuildTask(OwnedTask[Cargo]):
         return [Artifact(self.owner.build_dir)]
 
 
-class _CargoTestTask(_CargoBuildTask):
+class _CargoTestTask(OwnedTask[Cargo]):
 
     def run(self, ctx: Context) -> None:
         self.owner.test(ctx)
 
     def dependencies(self) -> List[Task]:
         return [
-            *super().dependencies(),
-            self.owner.build_task,
+            *self.owner.deps,
+            self.owner.rustc.install_task,
+            self.owner.rustc.cc.install_task,
         ]
