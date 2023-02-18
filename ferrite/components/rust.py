@@ -112,7 +112,7 @@ class Cargo(Component):
 
     @property
     def bin_dir(self) -> TargetPath:
-        return self.build_dir / str(self.rustc.target) / "debug"
+        return self.build_dir / str(self.rustc.target) / "release" if self.release else "debug"
 
     def src_path(self, ctx: Context) -> Path:
         if isinstance(self.src_dir, Path):
