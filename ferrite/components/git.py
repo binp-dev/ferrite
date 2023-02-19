@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from ferrite.utils.path import TargetPath
 from ferrite.utils.run import run, RunError
-from ferrite.components.base import Artifact, Component, Task, Context
+from ferrite.components.base import task, Component, Task, Context
 
 import logging
 
@@ -48,14 +48,14 @@ class RepoSource:
         return f"'{self.remote}'" + f", branch '{self.branch}'" if self.branch is not None else ""
 
 
-@dataclass(eq=False)
-class GitCloneTask(Task):
-
+@dataclass
+class RepoList(Component):
     path: TargetPath
     sources: List[RepoSource]
     cached: bool = False
 
-    def run(self, ctx: Context) -> None:
+    @task
+    def clone(self, ctx: Context) -> None:
         last_error = None
         for source in self.sources:
             try:
@@ -67,21 +67,6 @@ class GitCloneTask(Task):
                 continue
         if last_error is not None:
             raise last_error
-
-    def artifacts(self) -> List[Artifact]:
-        return [Artifact(self.path, cached=self.cached)]
-
-
-class RepoList(Component):
-
-    def __init__(self, dst_dir: TargetPath, sources: List[RepoSource], cached: bool = False):
-        super().__init__()
-
-        self.path = dst_dir
-        self.sources = sources
-        self.cached = cached
-
-        self.clone_task = GitCloneTask(self.path, self.sources, cached=cached)
 
 
 class Repo(RepoList):

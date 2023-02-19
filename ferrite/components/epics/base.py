@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, Generic, List, ClassVar, TypeVar
+from typing import Dict, Any, List, ClassVar
 
 import os
 import shutil
@@ -7,11 +7,11 @@ from pathlib import Path, PurePosixPath
 from dataclasses import dataclass, field
 import json
 
-import pydantic
+from dataclass_type_validator import dataclass_validate, TypeValidationError
 
 from ferrite.utils.path import TargetPath
 from ferrite.utils.run import capture, run
-from ferrite.components.base import Artifact, Component, OwnedTask, Context, Task
+from ferrite.components.base import task, Component, Context, Task
 from ferrite.components.compiler import Target, Gcc
 
 import logging
@@ -53,7 +53,9 @@ def _tree_mod_time(path: Path) -> int:
     return int(1000 * max_time)
 
 
-class _BuildInfo(pydantic.BaseModel):
+@dataclass_validate
+@dataclass
+class _BuildInfo:
     build_dir: str
     dep_mod_times: Dict[str, int]
 
@@ -70,12 +72,12 @@ class _BuildInfo(pydantic.BaseModel):
     def load(base_dir: Path) -> _BuildInfo:
         path = base_dir / _BuildInfo.FILE_NAME
         with open(path, "r") as f:
-            return _BuildInfo.parse_obj(json.load(f))
+            return _BuildInfo(**json.load(f))
 
     def store(self, base_dir: Path) -> None:
         path = base_dir / _BuildInfo.FILE_NAME
         with open(path, "w") as f:
-            json.dump(self.dict(), f, indent=2, sort_keys=True)
+            json.dump(self.__dict__, f, indent=2, sort_keys=True)
 
     def has_changed_since(self, other: _BuildInfo) -> bool:
         if self.build_dir != other.build_dir:
@@ -89,45 +91,24 @@ class _BuildInfo(pydantic.BaseModel):
         return False
 
 
-# Compiler
-C = TypeVar("C", bound=Gcc, covariant=True)
+class EpicsProject(Component):
 
-
-class EpicsProject(Component, Generic[C]):
-
-    # TODO: Use type aliases in 3.10
-    # Cc: TypeAlias = Gcc
-
-    def __init__(self, src_dir: Path | TargetPath, target_dir: TargetPath, target_name: str) -> None:
+    def __init__(
+        self,
+        src_dir: Path | TargetPath,
+        target_dir: TargetPath,
+        cc: Gcc,
+    ) -> None:
         super().__init__()
+        target_name = cc.name
         self.src_dir = src_dir
         self.build_dir = target_dir / target_name / "build"
         self.install_dir = target_dir / target_name / "install"
-
-    @property
-    def cc(self) -> C:
-        raise NotImplementedError()
+        self.cc = cc
 
     @property
     def arch(self) -> str:
         return epics_arch_by_target(self.cc.target)
-
-    @property
-    def build_task(self) -> EpicsBuildTask[EpicsProject[C]]:
-        raise NotImplementedError()
-
-    @property
-    def install_task(self) -> EpicsInstallTask[EpicsProject[C]]:
-        raise NotImplementedError()
-
-
-O = TypeVar("O", bound=EpicsProject[Gcc], covariant=True)
-
-
-@dataclass(eq=False)
-class EpicsBuildTask(OwnedTask[O]):
-    clean: bool = False
-    cached: bool = False
 
     def _prepare_source(self, ctx: Context) -> None:
         pass
@@ -139,14 +120,16 @@ class EpicsBuildTask(OwnedTask[O]):
         "Dependent paths."
         return []
 
-    def run(self, ctx: Context) -> None:
-        build_path = ctx.target_path / self.owner.build_dir
-        clean = self.clean
+    @task
+    def build(self, ctx: Context, clean: bool = False) -> None:
+        self.cc.install(ctx)
+
+        build_path = ctx.target_path / self.build_dir
 
         info = _BuildInfo.from_paths(build_path, self._dep_paths(ctx))
         try:
             stored_info = _BuildInfo.load(build_path)
-        except (FileNotFoundError, pydantic.ValidationError) as e:
+        except (FileNotFoundError, TypeValidationError) as e:
             logger.warning(e)
             clean = True
             pass
@@ -161,7 +144,7 @@ class EpicsBuildTask(OwnedTask[O]):
         self._prepare_source(ctx)
 
         shutil.copytree(
-            ctx.target_path / self.owner.src_dir,
+            ctx.target_path / self.src_dir,
             build_path,
             dirs_exist_ok=True,
             ignore=shutil.ignore_patterns(".git"),
@@ -179,47 +162,42 @@ class EpicsBuildTask(OwnedTask[O]):
 
         info.store(build_path)
 
-    def dependencies(self) -> List[Task]:
-        return [self.owner.cc.install_task]
-
-    def artifacts(self) -> List[Artifact]:
-        return [Artifact(self.owner.build_dir, cached=self.cached)]
-
-
-@dataclass(eq=False)
-class EpicsInstallTask(OwnedTask[O]):
-
     def _install(self, ctx: Context) -> None:
         raise NotImplementedError()
 
-    def run(self, ctx: Context) -> None:
-        install_path = ctx.target_path / self.owner.install_dir
-        logger.info(f"Install from {ctx.target_path / self.owner.build_dir} to {install_path}")
+    @task
+    def install(self, ctx: Context) -> None:
+        install_path = ctx.target_path / self.install_dir
+        logger.info(f"Install from {ctx.target_path / self.build_dir} to {install_path}")
         install_path.mkdir(exist_ok=True)
         self._install(ctx)
 
-    def dependencies(self) -> List[Task]:
-        return [self.owner.build_task]
 
-    def artifacts(self) -> List[Artifact]:
-        return [Artifact(self.owner.install_dir)]
+class EpicsProjectDeploy(EpicsProject):
 
+    def __init__(
+        self,
+        *args: Any,
+        deploy_path: PurePosixPath,
+        blacklist: List[str] = [],
+    ) -> None:
+        super().__init__(*args)
+        self.deploy_path = deploy_path
+        self.blacklist = blacklist
 
-@dataclass(eq=False)
-class EpicsDeployTask(OwnedTask[O]):
-    deploy_path: PurePosixPath
-    blacklist: List[str] = field(default_factory=lambda: [])
-
-    def _pre(self, ctx: Context) -> None:
+    def _pre_deploy(self, ctx: Context) -> None:
         pass
 
-    def _post(self, ctx: Context) -> None:
+    def _post_deploy(self, ctx: Context) -> None:
         pass
 
-    def run(self, ctx: Context) -> None:
-        install_path = ctx.target_path / self.owner.install_dir
+    @task
+    def deploy(self, ctx: Context) -> None:
+        self.install(ctx)
+
+        install_path = ctx.target_path / self.install_dir
         assert ctx.device is not None
-        self._pre(ctx)
+        self._pre_deploy(ctx)
         logger.info(f"Deploy {install_path} to {ctx.device.name()}:{self.deploy_path}")
         ctx.device.store(
             install_path,
@@ -227,7 +205,4 @@ class EpicsDeployTask(OwnedTask[O]):
             recursive=True,
             exclude=self.blacklist,
         )
-        self._post(ctx)
-
-    def dependencies(self) -> List[Task]:
-        return [self.owner.install_task]
+        self._post_deploy(ctx)

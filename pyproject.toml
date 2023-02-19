@@ -15,8 +15,8 @@ paramiko = "^2.9.2"
 types-paramiko = "^2.8.10"
 colorama = "^0.4.4"
 types-colorama = "^0.4.4"
-pydantic = "^1.9.0"
 numpy = "^1.23.2"
+dataclass-type-validator = "^0.1.2"
 
 [tool.poetry.dev-dependencies]
 yapf = "^0.32.0"

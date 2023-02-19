@@ -1,10 +1,10 @@
 from __future__ import annotations
-from typing import Any, Callable, Dict, List, Optional, Set, TypeVar, Generic
+from typing import Callable, TypeVar, Type, Tuple, Any, Dict, overload, List, Optional, TypeVar, Generic, overload
 
 from pathlib import Path
 from dataclasses import dataclass
+from inspect import signature, Parameter
 
-from ferrite.utils.path import TargetPath
 from ferrite.utils.log import LogLevel
 from ferrite.remote.base import Device
 
@@ -24,145 +24,130 @@ class Context:
         return self.log_level > LogLevel.INFO
 
 
-@dataclass
-class Artifact:
-    path: TargetPath
-    cached: bool = False
-
-
-# Task must be hashable, so any derived dataclass should use eq=False.
-@dataclass(eq=False)
 class Task:
 
-    def __post_init__(self) -> None:
-        self._name: Optional[str] = None
-
-    def name(self) -> str:
-        cls = self.__class__
-        return self._name or f"<{cls.__module__}.{cls.__qualname__}>({hash(self):x})"
-
-    def run(self, ctx: Context) -> None:
+    def __call__(self, ctx: Context, *args: Any, **kws: Any) -> None:
         raise NotImplementedError()
-
-    def dependencies(self) -> List[Task]:
-        return []
-
-    def graph(self) -> Dict[Task, Set[Task]]:
-        graph: Dict[Task, Set[Task]] = {}
-
-        def fill_graph(task: Task) -> None:
-            if task not in graph:
-                deps = task.dependencies()
-                graph[task] = set(deps)
-                for dep in deps:
-                    fill_graph(dep)
-            else:
-                # Check that task dependencies are the same.
-                assert len(graph[task].symmetric_difference(set(task.dependencies()))) == 0
-
-        fill_graph(self)
-        return graph
-
-    def run_with_dependencies(self, ctx: Context) -> None:
-        deps = self.dependencies()
-        assert isinstance(deps, list)
-
-        for dep in deps:
-            dep.run_with_dependencies(ctx)
-
-        self.run(ctx)
-
-    def artifacts(self) -> List[Artifact]:
-        return []
-
-
-class EmptyTask(Task):
-
-    def run(self, ctx: Context) -> None:
-        pass
-
-
-class CallTask(Task):
-
-    def __init__(self, func: Callable[[], None]) -> None:
-        super().__init__()
-        self.func = func
-
-    def run(self, ctx: Context) -> None:
-        self.func()
-
-
-class TaskList(Task):
-
-    def __init__(self, tasks: List[Task]) -> None:
-        super().__init__()
-        self.tasks = tasks
-
-    def run(self, ctx: Context) -> None:
-        pass
-
-    def dependencies(self) -> List[Task]:
-        return self.tasks
-
-    def artifacts(self) -> List[Artifact]:
-        return [art for task in self.tasks for art in task.artifacts()]
-
-
-class TaskWrapper(Task):
-
-    def __init__(self, inner: Optional[Task] = None, deps: List[Task] = []) -> None:
-        super().__init__()
-        self.inner = inner
-        self.deps = deps
-
-    def name(self) -> str:
-        if self.inner is not None:
-            return self.inner.name()
-        else:
-            return super().name()
-
-    def run(self, ctx: Context) -> None:
-        if self.inner is not None:
-            self.inner.run(ctx)
-
-    def dependencies(self) -> List[Task]:
-        inner_deps = []
-        if self.inner is not None:
-            inner_deps = self.inner.dependencies()
-        return inner_deps + self.deps
-
-    def artifacts(self) -> List[Artifact]:
-        return [
-            *(self.inner.artifacts() if self.inner is not None else []),
-            *[art for task in self.deps for art in task.artifacts()]
-        ]
 
 
 class Component:
 
     def tasks(self) -> Dict[str, Task]:
-        tasks: Dict[str, Task] = {}
-        for key, var in vars(self).items():
-            if isinstance(var, Task):
-                # Try to get task name
-                postfix = "_task"
-                if key.endswith(postfix):
-                    key = key[:-len(postfix)]
-                else:
-                    raise RuntimeWarning(f"Cannot determine task name for {type(self).__qualname__}.{key}")
-                if key.startswith("_"):
-                    key = key[1:]
+        return {k: v for k, v in {k: getattr(self, k) for k in dir(self)}.items() if isinstance(v, Task)}
 
-                assert (key not in tasks)
-                tasks[key] = var
 
-        return tasks
+T = TypeVar("T", bound=Component, contravariant=True)
 
-    def _update_names(self) -> None:
-        for task_name, task in self.tasks().items():
-            if hasattr(task, "_name") and task._name is not None:
-                raise RuntimeError(f"Task has multiple names: '{task._name}' and '{task_name}'")
-            task._name = f"{task_name}"
+
+@dataclass(eq=False, repr=False)
+class FunctionTask(Task):
+    func: Callable[[Context], None]
+
+    def __post_init__(self) -> None:
+        self.__name__ = self.func.__name__
+        self.__qualname__ = self.func.__qualname__
+
+    def __call__(self, ctx: Context, *args: Any, **kws: Any) -> None:
+        self.func(ctx, *args, **kws)
+
+    def __hash__(self) -> int:
+        return hash(self.func)
+
+    def __repr__(self) -> str:
+        return self.func.__repr__()
+
+
+@dataclass(eq=False, repr=False)
+class UnboundedTask:
+    method: Callable[[T, Context], None]
+
+    def __post_init__(self) -> None:
+        self.__name__ = self.method.__name__
+        self.__qualname__ = self.method.__qualname__
+
+    @overload
+    def __get__(self, obj: Component, type: type | None = None) -> Task:
+        ...
+
+    @overload
+    def __get__(self, obj: None, type: type | None = None) -> UnboundedTask:
+        ...
+
+    def __get__(self, obj: Component | None, type: type | None = None) -> Task | UnboundedTask:
+        if obj is not None:
+            return BoundedTask(obj, self)
+        else:
+            return self
+
+    def __set__(self, obj: Any, value: Any) -> None:
+        raise AttributeError()
+
+    def __call__(self, owner: T, ctx: Context, *args: Any, **kws: Any) -> None:
+        self.method(owner, ctx, *args, **kws)
+
+    def __hash__(self) -> int:
+        return hash(self.method)
+
+    def __repr__(self) -> str:
+        return self.method.__repr__()
+
+
+@dataclass(eq=False, repr=False)
+class BoundedTask(Task):
+    owner: Component
+    inner: UnboundedTask
+
+    @property
+    def method(self) -> Callable[[Context], None]:
+        method: Callable[[Context], None] = self.inner.method.__get__(self.owner)
+        return method
+
+    def __post_init__(self) -> None:
+        self.__name__ = self.method.__name__
+        self.__qualname__ = self.method.__qualname__
+
+    def __call__(self, ctx: Context, *args: Any, **kws: Any) -> None:
+        self.inner(self.owner, ctx, *args, **kws)
+
+    def __hash__(self) -> int:
+        return hash(self.method)
+
+    def __repr__(self) -> str:
+        return self.method.__repr__()
+
+
+@overload
+def task(func: Callable[[Context], None]) -> Task:
+    ...
+
+
+@overload
+def task(func: Callable[[T, Context], None]) -> UnboundedTask:
+    ...
+
+
+def task(func: Any) -> Any:
+    params = list(signature(func).parameters.values())
+
+    assert len(params) >= 1
+    if params[0].name == "self":
+        method = True
+        params = params[1:]
+    else:
+        method = False
+    assert len(params) >= 1
+    assert params[0].default is Parameter.empty
+    assert all([p.default is not Parameter.empty for p in params[1:]])
+
+    if method:
+        return UnboundedTask(func)
+    else:
+        return FunctionTask(func)
+
+
+@task
+def empty(ctx: Context) -> None:
+    pass
 
 
 @dataclass
@@ -186,11 +171,3 @@ class ComponentGroup(Component):
                 assert key not in tasks
                 tasks[key] = task
         return tasks
-
-
-O = TypeVar("O", bound=Component, covariant=True)
-
-
-@dataclass(eq=False)
-class OwnedTask(Task, Generic[O]):
-    owner: O
