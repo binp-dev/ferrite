@@ -4,14 +4,14 @@ from typing import Dict, Any, List, ClassVar
 import os
 import shutil
 from pathlib import Path, PurePosixPath
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import json
 
 from dataclass_type_validator import dataclass_validate, TypeValidationError
 
 from ferrite.utils.path import TargetPath
 from ferrite.utils.run import capture, run
-from ferrite.components.base import task, Component, Context, Task
+from ferrite.components.base import task, Component, Context
 from ferrite.components.compiler import Target, Gcc
 
 import logging
@@ -98,6 +98,8 @@ class EpicsProject(Component):
         src_dir: Path | TargetPath,
         target_dir: TargetPath,
         cc: Gcc,
+        deploy_path: PurePosixPath,
+        blacklist: List[str] = [],
     ) -> None:
         super().__init__()
         target_name = cc.name
@@ -105,6 +107,8 @@ class EpicsProject(Component):
         self.build_dir = target_dir / target_name / "build"
         self.install_dir = target_dir / target_name / "install"
         self.cc = cc
+        self.deploy_path = deploy_path
+        self.blacklist = blacklist
 
     @property
     def arch(self) -> str:
@@ -167,23 +171,12 @@ class EpicsProject(Component):
 
     @task
     def install(self, ctx: Context) -> None:
+        self.build(ctx)
+
         install_path = ctx.target_path / self.install_dir
         logger.info(f"Install from {ctx.target_path / self.build_dir} to {install_path}")
         install_path.mkdir(exist_ok=True)
         self._install(ctx)
-
-
-class EpicsProjectDeploy(EpicsProject):
-
-    def __init__(
-        self,
-        *args: Any,
-        deploy_path: PurePosixPath,
-        blacklist: List[str] = [],
-    ) -> None:
-        super().__init__(*args)
-        self.deploy_path = deploy_path
-        self.blacklist = blacklist
 
     def _pre_deploy(self, ctx: Context) -> None:
         pass

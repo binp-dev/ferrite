@@ -8,9 +8,8 @@ from pathlib import Path, PurePosixPath
 
 from ferrite.utils.path import TargetPath
 from ferrite.utils.files import substitute
-from ferrite.components.base import task, Task, Context
-from ferrite.components.compiler import GccCross
-from ferrite.components.epics.base import EpicsProject, EpicsProjectDeploy
+from ferrite.components.base import task, Context
+from ferrite.components.epics.base import EpicsProject
 from ferrite.components.epics.epics_base import AbstractEpicsBase, EpicsBaseCross, EpicsBaseHost
 from ferrite.utils.epics.ioc_remote import IocRemoteRunner
 
@@ -18,7 +17,7 @@ from ferrite.utils.epics.ioc_remote import IocRemoteRunner
 class AbstractIoc(EpicsProject):
 
     def __init__(self, ioc_dir: Path, target_dir: TargetPath, epics_base: AbstractEpicsBase, **kws: Any):
-        super().__init__(ioc_dir, target_dir, epics_base.cc)
+        super().__init__(ioc_dir, target_dir, epics_base.cc, deploy_path=PurePosixPath("/opt/ioc"))
         self.epics_base = epics_base
 
     @property
@@ -60,6 +59,11 @@ class AbstractIoc(EpicsProject):
         )
 
     @task
+    def deploy(self, ctx: Context) -> None:
+        self.epics_base.deploy(ctx)
+        super().deploy(ctx)
+
+    @task
     def run(self, ctx: Context) -> None:
         raise NotImplementedError()
 
@@ -70,10 +74,10 @@ class IocHost(AbstractIoc):
         super().__init__(ioc_dir, target_dir, epics_base)
 
 
-class IocCross(AbstractIoc, EpicsProjectDeploy):
+class IocCross(AbstractIoc):
 
     def __init__(self, ioc_dir: Path, target_dir: TargetPath, epics_base: EpicsBaseCross):
-        super().__init__(ioc_dir, target_dir, epics_base, deploy_path=PurePosixPath("/opt/ioc"))
+        super().__init__(ioc_dir, target_dir, epics_base)
         self.epics_deploy_path = epics_base.deploy_path
 
     def _configure(self, ctx: Context) -> None:
@@ -98,12 +102,6 @@ class IocCross(AbstractIoc, EpicsProjectDeploy):
             text = re.sub(r'(epicsEnvSet\("TOP",)[^\n]+', f'\\1"{self.deploy_path}")', text)
             text = re.sub(r'(epicsEnvSet\("EPICS_BASE",)[^\n]+', f'\\1"{self.epics_deploy_path}")', text)
             ctx.device.store_mem(text, self.deploy_path / "iocBoot" / ioc_name / "envPaths")
-
-    @task
-    def deploy(self, ctx: Context) -> None:
-        assert isinstance(self.epics_base, EpicsProjectDeploy)
-        self.epics_base.deploy(ctx)
-        super().deploy(ctx)
 
     @task
     def run(self, ctx: Context) -> None:

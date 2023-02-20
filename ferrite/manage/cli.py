@@ -8,7 +8,7 @@ from colorama import init as colorama_init, Fore, Style
 
 from ferrite.components.base import Context, Task, Component
 from ferrite.utils.log import LogLevel
-from ferrite.runner import Runner
+from ferrite.runner import run
 from ferrite.remote.ssh import SshDevice
 
 import logging
@@ -99,11 +99,6 @@ def add_parser_args(parser: argparse.ArgumentParser, comp: Component) -> None:
         help="Store cache locally (for rustup, cargo, etc.).",
     )
     parser.add_argument(
-        "--hide-artifacts",
-        action="store_true",
-        help="Hide artifacts which are unused by task. Useful to test task dependencies list.",
-    )
-    parser.add_argument(
         "-j",
         "--jobs",
         type=int,
@@ -173,7 +168,6 @@ def _make_context_from_args(args: argparse.Namespace) -> Context:
         log_level=log_level,
         update=args.update,
         local=args.local,
-        hide_artifacts=args.hide_artifacts,
         jobs=args.jobs,
     )
 
@@ -204,4 +198,4 @@ def setup_logging(params: RunParams, modules: List[str] = ["ferrite"]) -> None:
 
 def run_with_params(params: RunParams) -> None:
     _prepare_for_run(params)
-    Runner(params.task, no_deps=params.no_deps).run(params.context)
+    run(params.task, params.context, no_deps=params.no_deps)

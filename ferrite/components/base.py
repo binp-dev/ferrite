@@ -1,8 +1,8 @@
 from __future__ import annotations
-from typing import Callable, TypeVar, Any, Dict, overload, Optional, TypeVar, overload
+from typing import Callable, TypeVar, Any, Dict, overload, Optional, ContextManager, Set, List
 
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from inspect import signature, Parameter
 
 from ferrite.utils.log import LogLevel
@@ -16,8 +16,12 @@ class Context:
     log_level: LogLevel = LogLevel.WARNING
     update: bool = False
     local: bool = False
-    hide_artifacts: bool = False
     jobs: Optional[int] = None
+
+    _stack: List[Task] = field(default_factory=list)
+    _visited: Set[Task] = field(default_factory=set)
+    _guard: Optional[Callable[[Task, Context], ContextManager[None]]] = None
+    _no_deps: bool = False
 
     @property
     def capture(self) -> bool:
@@ -26,7 +30,31 @@ class Context:
 
 class Task:
 
+    def name(self) -> str:
+        raise NotImplementedError()
+
     def __call__(self, ctx: Context, *args: Any, **kws: Any) -> None:
+        if ctx._no_deps:
+            if len(ctx._stack) > 0 and self != ctx._stack[-1]:
+                return
+        else:
+            if self in ctx._visited:
+                return
+
+        if len(ctx._stack) > 0 and self in ctx._stack and ctx._stack[-1] != self:
+            raise RuntimeError(f"Task dependency cycle detected for {self}")
+
+        assert ctx._guard is not None
+        with ctx._guard(self, ctx):
+            ctx._stack.append(self)
+            try:
+                self.run(ctx, *args, **kws)
+            finally:
+                ctx._stack.pop()
+
+        ctx._visited.add(self)
+
+    def run(self, ctx: Context, *args: Any, **kws: Any) -> None:
         raise NotImplementedError()
 
 
@@ -47,7 +75,10 @@ class FunctionTask(Task):
         self.__name__ = self.func.__name__
         self.__qualname__ = self.func.__qualname__
 
-    def __call__(self, ctx: Context, *args: Any, **kws: Any) -> None:
+    def name(self) -> str:
+        return self.__qualname__
+
+    def run(self, ctx: Context, *args: Any, **kws: Any) -> None:
         self.func(ctx, *args, **kws)
 
     def __hash__(self) -> int:
@@ -60,6 +91,7 @@ class FunctionTask(Task):
 @dataclass(eq=False, repr=False)
 class UnboundedTask:
     method: Callable[[T, Context], None]
+    bounded: Optional[BoundedTask] = None
 
     def __post_init__(self) -> None:
         self.__name__ = self.method.__name__
@@ -75,14 +107,19 @@ class UnboundedTask:
 
     def __get__(self, obj: Component | None, type: type | None = None) -> Task | UnboundedTask:
         if obj is not None:
-            return BoundedTask(obj, self)
+            if self.bounded is None:
+                self.bounded = BoundedTask(obj, self)
+            return self.bounded
         else:
             return self
 
     def __set__(self, obj: Any, value: Any) -> None:
         raise AttributeError()
 
-    def __call__(self, owner: T, ctx: Context, *args: Any, **kws: Any) -> None:
+    def name(self) -> str:
+        return self.__qualname__
+
+    def run(self, owner: T, ctx: Context, *args: Any, **kws: Any) -> None:
         self.method(owner, ctx, *args, **kws)
 
     def __hash__(self) -> int:
@@ -106,8 +143,11 @@ class BoundedTask(Task):
         self.__name__ = self.method.__name__
         self.__qualname__ = self.method.__qualname__
 
-    def __call__(self, ctx: Context, *args: Any, **kws: Any) -> None:
-        self.inner(self.owner, ctx, *args, **kws)
+    def name(self) -> str:
+        return self.__qualname__
+
+    def run(self, ctx: Context, *args: Any, **kws: Any) -> None:
+        self.inner.run(self.owner, ctx, *args, **kws)
 
     def __hash__(self) -> int:
         return hash(self.method)
@@ -155,7 +195,10 @@ class TaskList(Task):
     def __init__(self, *tasks: Task) -> None:
         self.tasks = tasks
 
-    def __call__(self, ctx: Context, *args: Any, **kws: Any) -> None:
+    def name(self) -> str:
+        return f"TaskList({[t.name() for t in self.tasks]})"
+
+    def run(self, ctx: Context, *args: Any, **kws: Any) -> None:
         assert len(args) == 0
         assert len(kws) == 0
         for task in self.tasks:

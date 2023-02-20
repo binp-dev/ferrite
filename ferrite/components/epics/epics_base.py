@@ -6,10 +6,10 @@ from pathlib import Path, PurePosixPath
 
 from ferrite.utils.path import TargetPath
 from ferrite.utils.files import substitute, allow_patterns
-from ferrite.components.base import task, Task, Context
+from ferrite.components.base import task, Context
 from ferrite.components.git import RepoList, RepoSource
 from ferrite.components.compiler import Gcc, GccHost, GccCross
-from ferrite.components.epics.base import EpicsProject, EpicsProjectDeploy
+from ferrite.components.epics.base import EpicsProject
 
 import logging
 
@@ -17,6 +17,19 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractEpicsBase(EpicsProject):
+
+    def __init__(self, src_dir: Path | TargetPath, target_dir: TargetPath, cc: Gcc, blacklist: List[str] = []) -> None:
+        super().__init__(
+            src_dir,
+            target_dir,
+            cc,
+            deploy_path=PurePosixPath("/opt/epics_base"),
+            blacklist=[
+                "*.a",
+                "include/*",
+                *blacklist,
+            ],
+        )
 
     def _configure_common(self, ctx: Context) -> None:
         defs = [
@@ -78,6 +91,11 @@ class AbstractEpicsBase(EpicsProject):
                 ignore=shutil.ignore_patterns("O.*"),
             )
 
+    @task
+    def deploy(self, ctx: Context) -> None:
+        self.build(ctx)
+        super().deploy(ctx)
+
 
 class EpicsBaseHost(AbstractEpicsBase):
 
@@ -112,19 +130,14 @@ class EpicsBaseHost(AbstractEpicsBase):
         super().build(ctx)
 
 
-class EpicsBaseCross(AbstractEpicsBase, EpicsProjectDeploy):
+class EpicsBaseCross(AbstractEpicsBase):
 
     def __init__(self, cc: GccCross, host_base: EpicsBaseHost):
         super().__init__(
             host_base.build_dir,
             TargetPath(host_base.name),
             cc,
-            deploy_path=PurePosixPath("/opt/epics_base"),
-            blacklist=[
-                "*.a",
-                "include/*",
-                f"*/{host_base.arch}/*",
-            ],
+            blacklist=[f"*/{host_base.arch}/*"],
         )
         self.host_base = host_base
 
@@ -169,8 +182,3 @@ class EpicsBaseCross(AbstractEpicsBase, EpicsProjectDeploy):
             symlinks=True,
             ignore=allow_patterns("*.pl", "*.py"),
         )
-
-    @task
-    def deploy(self, ctx: Context) -> None:
-        self.build(ctx)
-        super().deploy(ctx)
