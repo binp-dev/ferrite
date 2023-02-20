@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List, Literal, overload
+from typing import List, overload
 
 import shutil
 from pathlib import Path, PurePosixPath
@@ -8,8 +8,7 @@ from dataclasses import dataclass
 from ferrite.utils.path import TargetPath
 from ferrite.utils.run import capture
 from ferrite.utils.net import download_alt
-from ferrite.components.base import task, Component, empty, Task, Context
-from ferrite.remote.base import Device
+from ferrite.components.base import task, Component, Context
 
 import logging
 

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, TypeVar, Type, Tuple, Any, Dict, overload, List, Optional, TypeVar, Generic, overload
+from typing import Callable, TypeVar, Any, Dict, overload, Optional, TypeVar, overload
 
 from pathlib import Path
 from dataclasses import dataclass
@@ -150,12 +150,25 @@ def empty(ctx: Context) -> None:
     pass
 
 
-@dataclass
+class TaskList(Task):
+
+    def __init__(self, *tasks: Task) -> None:
+        self.tasks = tasks
+
+    def __call__(self, ctx: Context, *args: Any, **kws: Any) -> None:
+        assert len(args) == 0
+        assert len(kws) == 0
+        for task in self.tasks:
+            task(ctx)
+
+
 class DictComponent(Component):
-    task_dict: Dict[str, Task]
+
+    def __init__(self, **tasks: Task) -> None:
+        self._tasks = tasks
 
     def tasks(self) -> Dict[str, Task]:
-        return self.task_dict
+        return self._tasks
 
 
 class ComponentGroup(Component):

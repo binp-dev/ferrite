@@ -1,12 +1,12 @@
 from __future__ import annotations
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ferrite.utils.path import TargetPath
 from ferrite.utils.run import run
-from ferrite.components.base import Artifact, Component, OwnedTask, Context, Task
+from ferrite.components.base import task, Component, Context
 from ferrite.components.compiler import Gcc
 
 
@@ -16,11 +16,7 @@ class Cmake(Component):
     src_dir: Path | TargetPath
     build_dir: TargetPath
     cc: Gcc
-    target: str # TODO: Rename to `cmake_target`
-    deps: List[Task] = field(default_factory=list)
-
-    def __post_init__(self) -> None:
-        self.build_task = _BuildTask(self)
+    build_target: Optional[str] = None
 
     def create_build_dir(self, ctx: Context) -> None:
         (ctx.target_path / self.build_dir).mkdir(exist_ok=True)
@@ -44,13 +40,17 @@ class Cmake(Component):
             quiet=ctx.capture,
         )
 
+    @task
     def build(self, ctx: Context, verbose: bool = False) -> None:
+        self.cc.install(ctx)
+        self.configure(ctx)
+
         run(
             [
                 "cmake",
                 "--build",
                 ctx.target_path / self.build_dir,
-                *["--target", self.target],
+                *(["--target", self.build_target] if self.build_target is not None else []),
                 "--parallel",
                 *([str(ctx.jobs)] if ctx.jobs is not None else []),
                 *(["--verbose"] if verbose else []),
@@ -60,41 +60,14 @@ class Cmake(Component):
         )
 
 
-class _BuildTask(OwnedTask[Cmake]):
-
-    def run(self, ctx: Context) -> None:
-        self.owner.configure(ctx)
-        self.owner.build(ctx)
-
-    def dependencies(self) -> List[Task]:
-        return [
-            *self.owner.deps,
-            self.owner.cc.install_task,
-        ]
-
-    def artifacts(self) -> List[Artifact]:
-        return [Artifact(self.owner.build_dir)]
-
-
 @dataclass
 class CmakeRunnable(Cmake):
 
-    def __post_init__(self) -> None:
-        super().__post_init__()
-        self.run_task = _RunTask(self)
-
+    @task
     def run(self, ctx: Context) -> None:
+        self.build(ctx)
         run(
-            [f"./{self.target}"],
+            [f"./{self.build_target}"],
             cwd=(ctx.target_path / self.build_dir),
             quiet=ctx.capture,
         )
-
-
-class _RunTask(OwnedTask[CmakeRunnable]):
-
-    def run(self, ctx: Context) -> None:
-        self.owner.run(ctx)
-
-    def dependencies(self) -> List[Task]:
-        return [self.owner.build_task]

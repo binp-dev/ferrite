@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List, Any
+from typing import Dict, List, Optional
 
 import re
 from pathlib import Path
@@ -7,26 +7,17 @@ from dataclasses import dataclass, field
 
 from ferrite.utils.path import TargetPath
 from ferrite.utils.run import run, capture
-from ferrite.components.base import Artifact, Component, OwnedTask, Context, Task
-from ferrite.components.compiler import Compiler, Gcc, GccCross, GccHost, Target, _InstallTask as CompilerInstallTask
+from ferrite.components.base import task, Component, Context
+from ferrite.components.compiler import Compiler, Gcc, GccCross, GccHost, Target
 
 
 class Rustc(Compiler):
 
-    def __init__(self, postfix: str, target: Target, cc: Gcc, toolchain: str = None):
-        self._install_task = _RustcInstallTask(self)
-        super().__init__(f"rustc_{postfix}", target, cached=True)
+    def __init__(self, postfix: str, target: Target, cc: Gcc, toolchain: Optional[str] = None):
+        super().__init__(f"rustc_{postfix}", target)
         self.path = TargetPath("rustup")
-        self._cc = cc
+        self.cc = cc
         self.toolchain = "stable" if toolchain is None else toolchain
-
-    @property
-    def install_task(self) -> _RustcInstallTask:
-        return self._install_task
-
-    @property
-    def cc(self) -> Gcc:
-        return self._cc
 
     def env(self, ctx: Context) -> Dict[str, str]:
         return {
@@ -34,7 +25,10 @@ class Rustc(Compiler):
             "RUSTUP_TOOLCHAIN": self.toolchain,
         }
 
+    @task
     def install(self, ctx: Context) -> None:
+        self.cc.install(ctx)
+
         cmds = [
             ["rustup", "set", "profile", "minimal"],
             ["rustup", "target", "add", str(self.target)],
@@ -44,20 +38,11 @@ class Rustc(Compiler):
             run(cmd, add_env=self.env(ctx), quiet=ctx.capture)
 
 
-class _RustcInstallTask(CompilerInstallTask, OwnedTask[Rustc]):
-
-    def run(self, ctx: Context) -> None:
-        self.owner.install(ctx)
-
-    def artifacts(self) -> List[Artifact]:
-        return [Artifact(self.owner.path, cached=True)]
-
-
 class RustcHost(Rustc):
 
     _target_pattern: re.Pattern[str] = re.compile(r"^Default host:\s+(\S+)$", re.MULTILINE)
 
-    def __init__(self, cc: GccHost, toolchain: str = None):
+    def __init__(self, cc: GccHost, toolchain: Optional[str] = None):
         info = capture(["rustup", "show"])
         match = re.search(self._target_pattern, info)
         assert match is not None, f"Cannot detect rustup host rustc:\n{info}"
@@ -67,13 +52,8 @@ class RustcHost(Rustc):
 
 class RustcCross(Rustc):
 
-    def __init__(self, postfix: str, target: Target, cc: GccCross, toolchain: str = None):
-        self._cc_cross = cc
+    def __init__(self, postfix: str, target: Target, cc: GccCross, toolchain: Optional[str] = None):
         super().__init__(postfix, target, cc, toolchain=toolchain)
-
-    @property
-    def cc(self) -> GccCross:
-        return self._cc_cross
 
     def env(self, ctx: Context) -> Dict[str, str]:
         target_uu = str(self.target).upper().replace("-", "_")
@@ -89,16 +69,12 @@ class Cargo(Component):
     src_dir: Path | TargetPath
     build_dir: TargetPath
     rustc: Rustc
-    deps: List[Task] = field(default_factory=list)
     features: List[str] = field(default_factory=list)
     default_features: bool = True
     release: bool = False
 
     def __post_init__(self) -> None:
         self.home_dir = Path.cwd() / ".cargo"
-
-        self.build_task = _CargoBuildTask(self)
-        self.test_task = _CargoTestTask(self)
 
     def log_env(self, ctx: Context) -> Dict[str, str]:
         return {"RUST_LOG": ctx.log_level.name()}
@@ -112,7 +88,7 @@ class Cargo(Component):
 
     @property
     def bin_dir(self) -> TargetPath:
-        return self.build_dir / str(self.rustc.target) / "release" if self.release else "debug"
+        return self.build_dir / str(self.rustc.target) / ("release" if self.release else "debug")
 
     def src_path(self, ctx: Context) -> Path:
         if isinstance(self.src_dir, Path):
@@ -120,7 +96,10 @@ class Cargo(Component):
         else:
             return ctx.target_path / self.src_dir
 
+    @task
     def build(self, ctx: Context) -> None:
+        self.rustc.install(ctx)
+
         cmds = [
             *([["cargo", "update"]] if ctx.update else []),
             [
@@ -135,7 +114,10 @@ class Cargo(Component):
         for cmd in cmds:
             run(cmd, cwd=self.src_path(ctx), add_env=self.env(ctx), quiet=ctx.capture)
 
+    @task
     def test(self, ctx: Context) -> None:
+        self.rustc.install(ctx)
+
         run(
             [
                 "cargo",
@@ -149,32 +131,3 @@ class Cargo(Component):
             add_env=self.env(ctx),
             quiet=ctx.capture,
         )
-
-
-class _CargoBuildTask(OwnedTask[Cargo]):
-
-    def run(self, ctx: Context) -> None:
-        self.owner.build(ctx)
-
-    def dependencies(self) -> List[Task]:
-        return [
-            *self.owner.deps,
-            self.owner.rustc.install_task,
-            self.owner.rustc.cc.install_task,
-        ]
-
-    def artifacts(self) -> List[Artifact]:
-        return [Artifact(self.owner.build_dir)]
-
-
-class _CargoTestTask(OwnedTask[Cargo]):
-
-    def run(self, ctx: Context) -> None:
-        self.owner.test(ctx)
-
-    def dependencies(self) -> List[Task]:
-        return [
-            *self.owner.deps,
-            self.owner.rustc.install_task,
-            self.owner.rustc.cc.install_task,
-        ]
