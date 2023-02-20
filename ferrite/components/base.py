@@ -81,9 +81,6 @@ class FunctionTask(Task):
     def run(self, ctx: Context, *args: Any, **kws: Any) -> None:
         self.func(ctx, *args, **kws)
 
-    def __hash__(self) -> int:
-        return hash(self.func)
-
     def __repr__(self) -> str:
         return self.func.__repr__()
 
@@ -91,7 +88,6 @@ class FunctionTask(Task):
 @dataclass(eq=False, repr=False)
 class UnboundedTask:
     method: Callable[[T, Context], None]
-    bounded: Optional[BoundedTask] = None
 
     def __post_init__(self) -> None:
         self.__name__ = self.method.__name__
@@ -107,9 +103,13 @@ class UnboundedTask:
 
     def __get__(self, obj: Component | None, type: type | None = None) -> Task | UnboundedTask:
         if obj is not None:
-            if self.bounded is None:
-                self.bounded = BoundedTask(obj, self)
-            return self.bounded
+            name = f"__task_{hash(self.method):x}_bounded"
+            try:
+                bounded: BoundedTask = getattr(obj, name)
+            except AttributeError:
+                bounded = BoundedTask(obj, self)
+                setattr(obj, name, bounded)
+            return bounded
         else:
             return self
 
@@ -121,9 +121,6 @@ class UnboundedTask:
 
     def run(self, owner: T, ctx: Context, *args: Any, **kws: Any) -> None:
         self.method(owner, ctx, *args, **kws)
-
-    def __hash__(self) -> int:
-        return hash(self.method)
 
     def __repr__(self) -> str:
         return self.method.__repr__()
@@ -148,9 +145,6 @@ class BoundedTask(Task):
 
     def run(self, ctx: Context, *args: Any, **kws: Any) -> None:
         self.inner.run(self.owner, ctx, *args, **kws)
-
-    def __hash__(self) -> int:
-        return hash(self.method)
 
     def __repr__(self) -> str:
         return self.method.__repr__()

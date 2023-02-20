@@ -21,17 +21,11 @@ def run(task: Task, ctx: Context, no_deps: bool = False) -> None:
 
 @contextmanager
 def with_info(task: Task, ctx: Context) -> Generator[None, None, None]:
-    depth = len(set(ctx._stack))
-    _print_title(f"{' ' * depth}{task.name()} started ...", Style.BRIGHT)
+    tab = ' ' * len(set(ctx._stack))
+    print(f"{tab}{Style.BRIGHT + Fore.WHITE}{task.name()}{Style.NORMAL} started ...{Style.RESET_ALL}")
     try:
         yield
     except:
-        _print_title(f"{' ' * depth}{task.name()} FAILED:", Style.BRIGHT + Fore.RED)
+        print(f"{tab}{Style.BRIGHT + Fore.RED}{task.name()}{Style.NORMAL} FAILED:{Style.RESET_ALL}")
     else:
-        _print_title(f"{' ' * depth}{task.name()} done", Style.BRIGHT + Fore.GREEN)
-
-
-def _print_title(text: str, style: Optional[str] = None, end: bool = True) -> None:
-    if style is not None:
-        text = style + text + Style.RESET_ALL
-    print(text, flush=True, end=("" if not end else None))
+        print(f"{tab}{Style.BRIGHT + Fore.GREEN}{task.name()}{Style.NORMAL} done{Style.RESET_ALL}")
