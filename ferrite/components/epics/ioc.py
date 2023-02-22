@@ -59,6 +59,11 @@ class AbstractIoc(EpicsProject):
         )
 
     @task
+    def install(self, ctx: Context) -> None:
+        self.epics_base.install(ctx)
+        super().install(ctx)
+
+    @task
     def deploy(self, ctx: Context) -> None:
         self.epics_base.deploy(ctx)
         super().deploy(ctx)
