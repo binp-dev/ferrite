@@ -27,5 +27,6 @@ def with_info(task: Task, ctx: Context) -> Generator[None, None, None]:
         yield
     except:
         print(f"{tab}{Style.BRIGHT + Fore.RED}{task.name()}{Style.NORMAL} FAILED:{Style.RESET_ALL}")
+        raise
     else:
         print(f"{tab}{Style.BRIGHT + Fore.GREEN}{task.name()}{Style.NORMAL} done{Style.RESET_ALL}")
