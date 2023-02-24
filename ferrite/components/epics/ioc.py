@@ -12,6 +12,7 @@ from ferrite.components.base import task, Context
 from ferrite.components.epics.base import EpicsProject
 from ferrite.components.epics.epics_base import AbstractEpicsBase, EpicsBaseCross, EpicsBaseHost
 from ferrite.utils.epics.ioc_remote import IocRemoteRunner
+from ferrite.utils.epics.ioc import Ioc
 
 
 class AbstractIoc(EpicsProject):
@@ -78,6 +79,17 @@ class IocHost(AbstractIoc):
     def __init__(self, ioc_dir: Path, target_dir: TargetPath, epics_base: EpicsBaseHost):
         super().__init__(ioc_dir, target_dir, epics_base)
 
+    @task
+    def run(self, ctx: Context) -> None:
+        self.install(ctx)
+        with Ioc(
+            self.name,
+            epics_base_dir=ctx.target_path / self.epics_base.install_dir,
+            ioc_dir=ctx.target_path / self.install_dir,
+            arch=self.arch,
+        ) as ioc:
+            ioc.wait()
+
 
 class IocCross(AbstractIoc):
 
@@ -122,7 +134,7 @@ class IocCross(AbstractIoc):
             self.epics_base.arch,
         ):
             try:
-                while True:
+                while ctx._running:
                     time.sleep(1)
             except KeyboardInterrupt:
                 pass

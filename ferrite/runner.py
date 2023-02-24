@@ -11,6 +11,7 @@ from colorama import Fore, Style
 def run(task: Task, ctx: Context, no_deps: bool = False) -> None:
     ctx.target_path.mkdir(exist_ok=True)
 
+    ctx._running = True
     ctx._stack = []
     ctx._visited = set()
     ctx._guard = with_info

@@ -18,6 +18,7 @@ class Context:
     local: bool = False
     jobs: Optional[int] = None
 
+    _running: bool = True
     _stack: List[Task] = field(default_factory=list)
     _visited: Set[Task] = field(default_factory=set)
     _guard: Optional[Callable[[Task, Context], ContextManager[None]]] = None
@@ -61,7 +62,15 @@ class Task:
 class Component:
 
     def tasks(self) -> Dict[str, Task]:
-        return {k: v for k, v in {k: getattr(self, k) for k in dir(self)}.items() if isinstance(v, Task)}
+        names: Dict[Task, str] = {}
+        for name, task in {k: getattr(self, k) for k in dir(self)}.items():
+            if isinstance(task, Task):
+                names[task] = name
+        for name, unb_task in {k: getattr(self.__class__, k) for k in dir(self.__class__)}.items():
+            if isinstance(unb_task, UnboundedTask):
+                task = unb_task.__get__(self)
+                names[task] = name
+        return {v: k for k, v in names.items()}
 
 
 T = TypeVar("T", bound=Component, contravariant=True)
@@ -137,11 +146,11 @@ class BoundedTask(Task):
         return method
 
     def __post_init__(self) -> None:
-        self.__name__ = self.method.__name__
-        self.__qualname__ = self.method.__qualname__
+        self.__name__ = self.inner.__name__
+        self.__qualname__ = self.inner.__qualname__
 
     def name(self) -> str:
-        return self.__qualname__
+        return self.inner.__qualname__
 
     def run(self, ctx: Context, *args: Any, **kws: Any) -> None:
         self.inner.run(self.owner, ctx, *args, **kws)
