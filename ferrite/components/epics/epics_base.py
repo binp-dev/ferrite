@@ -163,6 +163,12 @@ class EpicsBaseCross(AbstractEpicsBase):
             ctx.target_path / self.build_dir / f"configure/os/CONFIG_SITE.{host_arch}.{cross_arch}",
         )
 
+    def _dep_paths(self, ctx: Context) -> List[Path]:
+        return [
+            *super()._dep_paths(ctx),
+            ctx.target_path / self.host_base.build_dir,
+        ]
+
     @task
     def build(self, ctx: Context) -> None:
         self.host_base.build(ctx)

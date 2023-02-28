@@ -14,7 +14,8 @@ class TaskThread(Thread):
             self.task(self.ctx)
         except RuntimeError as e:
             self.queue.put(e)
-        self.queue.put(None)
+        else:
+            self.queue.put(None)
 
     def __init__(self, ctx: Context, task: Task, queue: Queue[Optional[RuntimeError]]) -> None:
         super().__init__(target=self.thread_func)

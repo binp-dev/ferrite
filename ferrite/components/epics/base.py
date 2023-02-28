@@ -1,18 +1,14 @@
 from __future__ import annotations
-from typing import Dict, Any, List, ClassVar
+from typing import List
 
-import os
 import shutil
 from pathlib import Path, PurePosixPath
-from dataclasses import dataclass
-import json
-
-from dataclass_type_validator import dataclass_validate, TypeValidationError
 
 from ferrite.utils.path import TargetPath
 from ferrite.utils.run import capture, run
 from ferrite.components.base import task, Component, Context
 from ferrite.components.compiler import Target, Gcc
+from ferrite.components.utils import TreeModInfo
 
 import logging
 
@@ -36,59 +32,6 @@ def epics_arch_by_target(target: Target) -> str:
             return "linux-aarch64"
     # TODO: Add some other archs
     raise Exception(f"Unknown target for EPICS: {str(target)}")
-
-
-# Milliseconds from the start of the epoch
-def _tree_mod_time(path: Path) -> int:
-    if path.is_dir():
-        max_time = 0.0
-        for dirpath, dirnames, filenames in os.walk(path):
-            max_time = max([
-                max_time,
-                os.path.getmtime(dirpath),
-                *[os.path.getmtime(os.path.join(dirpath, fn)) for fn in filenames],
-            ])
-    else:
-        max_time = os.path.getmtime(path)
-    return int(1000 * max_time)
-
-
-@dataclass_validate
-@dataclass
-class _BuildInfo:
-    build_dir: str
-    dep_mod_times: Dict[str, int]
-
-    FILE_NAME: ClassVar[str] = "build_info.json"
-
-    @staticmethod
-    def from_paths(base_dir: Path, dep_paths: List[Path]) -> _BuildInfo:
-        return _BuildInfo(
-            build_dir=str(base_dir),
-            dep_mod_times={str(path): _tree_mod_time(path) for path in dep_paths},
-        )
-
-    @staticmethod
-    def load(base_dir: Path) -> _BuildInfo:
-        path = base_dir / _BuildInfo.FILE_NAME
-        with open(path, "r") as f:
-            return _BuildInfo(**json.load(f))
-
-    def store(self, base_dir: Path) -> None:
-        path = base_dir / _BuildInfo.FILE_NAME
-        with open(path, "w") as f:
-            json.dump(self.__dict__, f, indent=2, sort_keys=True)
-
-    def has_changed_since(self, other: _BuildInfo) -> bool:
-        if self.build_dir != other.build_dir:
-            return True
-        for path, time in self.dep_mod_times.items():
-            try:
-                if time > other.dep_mod_times[path]:
-                    return True
-            except KeyError:
-                return True
-        return False
 
 
 class EpicsProject(Component):
@@ -130,17 +73,12 @@ class EpicsProject(Component):
 
         build_path = ctx.target_path / self.build_dir
 
-        info = _BuildInfo.from_paths(build_path, self._dep_paths(ctx))
-        try:
-            stored_info = _BuildInfo.load(build_path)
-        except (FileNotFoundError, TypeValidationError) as e:
-            logger.warning(e)
+        info = TreeModInfo.load(build_path)
+        if info is None or not info.newer_than(*self._dep_paths(ctx)):
             clean = True
-            pass
         else:
-            if not info.has_changed_since(stored_info):
-                logger.info(f"'{build_path}' is already built")
-                return
+            logger.info(f"'{build_path}' is already built")
+            return
 
         if clean:
             shutil.rmtree(build_path, ignore_errors=True)
@@ -164,7 +102,7 @@ class EpicsProject(Component):
             quiet=ctx.capture,
         )
 
-        info.store(build_path)
+        TreeModInfo(build_path).store()
 
     def _install(self, ctx: Context) -> None:
         raise NotImplementedError()
@@ -173,10 +111,20 @@ class EpicsProject(Component):
     def install(self, ctx: Context) -> None:
         self.build(ctx)
 
+        build_path = ctx.target_path / self.build_dir
         install_path = ctx.target_path / self.install_dir
-        logger.info(f"Install from {ctx.target_path / self.build_dir} to {install_path}")
-        install_path.mkdir(exist_ok=True)
+
+        info = TreeModInfo.load(install_path)
+        if info is not None and info.newer_than(build_path):
+            logger.info(f"'{install_path}' is already installed")
+            return
+
+        logger.info(f"Install from {build_path} to {install_path}")
+        shutil.rmtree(install_path, ignore_errors=True)
+        install_path.mkdir()
         self._install(ctx)
+
+        TreeModInfo(install_path).store()
 
     def _pre_deploy(self, ctx: Context) -> None:
         pass

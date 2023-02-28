@@ -99,7 +99,7 @@ class GccCross(Gcc):
 
     @property
     def path(self) -> TargetPath:
-        return TargetPath(f"toolchain_{self.dir_name}")
+        return TargetPath(f"toolchains/{self.dir_name}")
 
     def bin(self, name: str) -> TargetPath:
         return self.path / "bin" / f"{self.target}-{name}"
