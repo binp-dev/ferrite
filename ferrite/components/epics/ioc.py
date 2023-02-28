@@ -11,8 +11,8 @@ from ferrite.utils.files import substitute
 from ferrite.components.base import task, Context
 from ferrite.components.epics.base import EpicsProject
 from ferrite.components.epics.epics_base import AbstractEpicsBase, EpicsBaseCross, EpicsBaseHost
+from ferrite.components.process import run
 from ferrite.utils.epics.ioc_remote import IocRemoteRunner
-from ferrite.utils.epics.ioc import Ioc
 
 
 class AbstractIoc(EpicsProject):
@@ -83,13 +83,20 @@ class IocHost(AbstractIoc):
     @task
     def run(self, ctx: Context) -> None:
         self.install(ctx)
-        with Ioc(
-            self.name,
-            epics_base_dir=ctx.target_path / self.epics_base.install_dir,
-            ioc_dir=ctx.target_path / self.install_dir,
-            arch=self.arch,
-        ) as ioc:
-            ioc.wait()
+
+        name = self.name
+        epics_base_dir = ctx.target_path / self.epics_base.install_dir
+        ioc_dir = ctx.target_path / self.install_dir
+        arch = self.arch
+
+        binary = ioc_dir / "bin" / arch / name
+        script = ioc_dir / f"iocBoot/ioc{name}/st.cmd"
+        args = [binary, script]
+        cwd = script.parent
+        lib_dirs = [epics_base_dir / "lib" / arch, ioc_dir / "lib" / arch]
+        env = {"LD_LIBRARY_PATH": ":".join([str(p) for p in lib_dirs])}
+
+        run(ctx, args, cwd=cwd, env=env)
 
 
 class IocCross(AbstractIoc):

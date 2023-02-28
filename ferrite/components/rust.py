@@ -1,17 +1,15 @@
 from __future__ import annotations
 from typing import Dict, List, Optional
 
-import os
 import re
-import time
 from pathlib import Path
 from dataclasses import dataclass, field
-from subprocess import Popen, CalledProcessError
 
 from ferrite.utils.path import TargetPath
 from ferrite.utils.run import run, capture
 from ferrite.components.base import task, Component, Context
 from ferrite.components.compiler import Compiler, Gcc, GccCross, GccHost, Target
+from ferrite.components.process import run as run_with_ctx
 
 import logging
 
@@ -113,7 +111,7 @@ class Cargo(Component):
                 "cargo",
                 "build",
                 f"--target={self.rustc.target}",
-                f"--features={','.join(self.features)}",
+                *([f"--features={','.join(self.features)}"] if len(self.features) > 0 else []),
                 *(["--no-default-features"] if not self.default_features else []),
                 *(["--release"] if self.release else []),
             ],
@@ -129,7 +127,7 @@ class Cargo(Component):
             [
                 "cargo",
                 "test",
-                f"--features={','.join(self.features)}",
+                *([f"--features={','.join(self.features)}"] if len(self.features) > 0 else []),
                 *(["--no-default-features"] if not self.default_features else []),
                 #"--",
                 #"--nocapture",
@@ -143,28 +141,15 @@ class Cargo(Component):
     def run(self, ctx: Context, bin: Optional[str] = None) -> None:
         self.rustc.install(ctx)
 
-        cmd = [
-            "cargo",
-            "run",
-            *([bin] if bin is not None else []),
-            f"--features={','.join(self.features)}",
-            *(["--no-default-features"] if not self.default_features else []),
-        ]
-        env = {**dict(os.environ), **self.env(ctx)}
-        proc: Optional[Popen[str]] = Popen(cmd, cwd=self.src_path(ctx), env=env, text=True)
-        logger.debug(f"Program started: {cmd}")
-
-        assert proc is not None
-        while ctx._running:
-            time.sleep(0.1)
-            ret = proc.poll()
-            if ret is not None:
-                proc = None
-                if ret != 0:
-                    raise CalledProcessError(ret, cmd)
-                break
-
-        if proc is not None:
-            logger.debug("Terminating program ...")
-            proc.terminate()
-            logger.debug(f"Program terminated")
+        run_with_ctx(
+            ctx,
+            [
+                "cargo",
+                "run",
+                *([bin] if bin is not None else []),
+                *([f"--features={','.join(self.features)}"] if len(self.features) > 0 else []),
+                *(["--no-default-features"] if not self.default_features else []),
+            ],
+            cwd=self.src_path(ctx),
+            env=self.env(ctx),
+        )

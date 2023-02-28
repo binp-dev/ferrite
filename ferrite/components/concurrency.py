@@ -12,12 +12,12 @@ class TaskThread(Thread):
     def thread_func(self) -> None:
         try:
             self.task(self.ctx)
-        except RuntimeError as e:
+        except BaseException as e:
             self.queue.put(e)
         else:
             self.queue.put(None)
 
-    def __init__(self, ctx: Context, task: Task, queue: Queue[Optional[RuntimeError]]) -> None:
+    def __init__(self, ctx: Context, task: Task, queue: Queue[Optional[BaseException]]) -> None:
         super().__init__(target=self.thread_func)
         self.ctx = ctx
         self.task = task
@@ -29,12 +29,12 @@ class ConcurrentTaskList(TaskList):
     def run(self, ctx: Context, *args: Any, **kws: Any) -> None:
         assert len(args) == 0
         assert len(kws) == 0
-        queue: Queue[Optional[RuntimeError]] = Queue()
+        queue: Queue[Optional[BaseException]] = Queue()
         threads = [TaskThread(ctx, t, queue) for t in self.tasks]
         for th in threads:
             th.start()
 
-        e: Optional[RuntimeError] = None
+        e: Optional[BaseException] = None
         count = 0
         try:
             while count < len(threads):
@@ -44,8 +44,9 @@ class ConcurrentTaskList(TaskList):
                     break
                 else:
                     count += 1
-        except KeyboardInterrupt:
+        except KeyboardInterrupt as ke:
             ctx._running = False
+            e = ke
 
         for th in threads:
             th.join()
