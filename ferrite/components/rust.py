@@ -146,7 +146,7 @@ class Cargo(Component):
             [
                 "cargo",
                 "run",
-                *([bin] if bin is not None else []),
+                *(["--bin", bin] if bin is not None else []),
                 *([f"--features={','.join(self.features)}"] if len(self.features) > 0 else []),
                 *(["--no-default-features"] if not self.default_features else []),
             ],
