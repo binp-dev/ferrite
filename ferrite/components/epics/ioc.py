@@ -71,7 +71,7 @@ class AbstractIoc(EpicsProject):
         super().deploy(ctx)
 
     @task
-    def run(self, ctx: Context) -> None:
+    def run(self, ctx: Context, addr_list: List[str] = []) -> None:
         raise NotImplementedError()
 
 
@@ -81,7 +81,7 @@ class IocHost(AbstractIoc):
         super().__init__(ioc_dir, target_dir, epics_base)
 
     @task
-    def run(self, ctx: Context) -> None:
+    def run(self, ctx: Context, addr_list: List[str] = []) -> None:
         self.install(ctx)
 
         name = self.name
@@ -94,7 +94,13 @@ class IocHost(AbstractIoc):
         args = [binary, script]
         cwd = script.parent
         lib_dirs = [epics_base_dir / "lib" / arch, ioc_dir / "lib" / arch]
-        env = {"LD_LIBRARY_PATH": ":".join([str(p) for p in lib_dirs])}
+        env = {
+            **({
+                "EPICS_CA_AUTO_ADDR_LIST": "NO",
+                "EPICS_CA_ADDR_LIST": ",".join(addr_list),
+            } if len(addr_list) > 0 else {}),
+            "LD_LIBRARY_PATH": ":".join([str(p) for p in lib_dirs]),
+        }
 
         run(ctx, args, cwd=cwd, env=env)
 
@@ -129,8 +135,9 @@ class IocCross(AbstractIoc):
             ctx.device.store_mem(text, self.deploy_path / "iocBoot" / ioc_name / "envPaths")
 
     @task
-    def run(self, ctx: Context) -> None:
+    def run(self, ctx: Context, addr_list: List[str] = []) -> None:
         self.deploy(ctx)
+        assert len(addr_list) == 0
 
         assert ctx.device is not None
         assert isinstance(self.epics_base, EpicsBaseCross)

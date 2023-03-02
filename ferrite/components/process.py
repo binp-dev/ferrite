@@ -31,14 +31,14 @@ def run(
     if not ctx._running:
         return
 
-    cmd = [str(a) for a in args]
+    x_args = [str(a) for a in args]
     if mode == RunMode.DEBUGGER:
-        cmd = ["gdb", "-batch", "-ex", "run", "-ex", "bt", "-args"] + cmd
+        x_args = ["gdb", "-batch", "-ex", "run", "-ex", "bt", "-args"] + x_args
     elif mode == RunMode.PROFILER:
-        cmd = ["perf", "record"] + cmd
-    env = {**dict(os.environ), **{k: str(v) for k, v in env.items()}}
-    proc: Optional[Popen[str]] = Popen(cmd, cwd=cwd, env=env, text=True)
-    logger.debug(f"Process started: {cmd}")
+        x_args = ["perf", "record"] + x_args
+    x_env = {**dict(os.environ), **{k: str(v) for k, v in env.items()}}
+    proc: Optional[Popen[str]] = Popen(x_args, cwd=cwd, env=x_env, text=True)
+    logger.debug(f"Process started: {x_args}, env={env}")
 
     assert proc is not None
     while ctx._running:
@@ -47,9 +47,9 @@ def run(
         if ret is not None:
             proc = None
             if ret != 0:
-                raise CalledProcessError(ret, cmd)
+                raise CalledProcessError(ret, x_args)
             break
 
     if proc is not None:
         proc.terminate()
-        logger.debug(f"Process terminated: {cmd}")
+        logger.debug(f"Process terminated: {x_args}")
