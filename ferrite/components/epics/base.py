@@ -65,7 +65,7 @@ class EpicsProject(Component):
 
     def _dep_paths(self, ctx: Context) -> List[Path]:
         "Dependent paths."
-        return []
+        return [ctx.target_path / self.src_dir]
 
     @task
     def build(self, ctx: Context, clean: bool = False) -> None:
