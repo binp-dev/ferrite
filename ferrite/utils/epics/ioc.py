@@ -70,7 +70,7 @@ class Ioc(IocBase):
 
     def start(self) -> None:
         cmd = self.cmd()
-        self.proc: Optional[Popen[str] | None] = Popen(cmd, cwd=self.cwd(), env=self.env(), text=True)
+        self.proc: Optional[Popen[str]] = Popen(cmd, cwd=self.cwd(), env=self.env(), text=True)
         logger.debug(f"IOC started: {cmd}")
 
     def stop(self) -> None:
