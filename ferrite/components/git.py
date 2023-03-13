@@ -52,7 +52,6 @@ class RepoSource:
 class RepoList(Component):
     path: TargetPath
     sources: List[RepoSource]
-    cached: bool = False
 
     @task
     def clone(self, ctx: Context) -> None:

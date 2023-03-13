@@ -115,7 +115,6 @@ class EpicsBaseHost(AbstractEpicsBase):
                 RepoSource("https://gitlab.inp.nsk.su/epics/epics-base.git", f"binp-R{self.version}"),
                 RepoSource("https://github.com/epics-base/epics-base.git", f"R{self.version}"),
             ],
-            cached=True,
         )
 
     def _configure_toolchain(self, ctx: Context) -> None:
