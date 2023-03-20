@@ -5,9 +5,9 @@ import shutil
 from pathlib import Path
 from dataclasses import dataclass
 
-from ferrite.utils.path import TargetPath
-from ferrite.utils.run import run, RunError
-from ferrite.components.base import task, Component, Task, Context
+from vortex.utils.path import TargetPath
+from vortex.utils.run import run, RunError
+from vortex.tasks.base import task, Component, Task, Context
 
 import logging
 
@@ -69,6 +69,5 @@ class RepoList(Component):
 
 
 class Repo(RepoList):
-
     def __init__(self, dst_dir: TargetPath, remote: str, branch: Optional[str] = None):
         super().__init__(dst_dir, [RepoSource(remote, branch)])

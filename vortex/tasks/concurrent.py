@@ -4,11 +4,10 @@ from typing import Callable, TypeVar, Any, Dict, overload, Optional, ContextMana
 from threading import Thread
 from multiprocessing import Queue
 
-from ferrite.components.base import Context, Task, TaskList
+from vortex.tasks.base import Context, Task, TaskList
 
 
 class TaskThread(Thread):
-
     def thread_func(self) -> None:
         try:
             self.task(self.ctx)
@@ -25,7 +24,6 @@ class TaskThread(Thread):
 
 
 class ConcurrentTaskList(TaskList):
-
     def run(self, ctx: Context, *args: Any, **kws: Any) -> None:
         assert len(args) == 0
         assert len(kws) == 0

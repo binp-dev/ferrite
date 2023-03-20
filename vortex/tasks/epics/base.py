@@ -4,11 +4,11 @@ from typing import List
 import shutil
 from pathlib import Path, PurePosixPath
 
-from ferrite.utils.path import TargetPath
-from ferrite.utils.run import capture, run
-from ferrite.components.base import task, Component, Context
-from ferrite.components.compiler import Target, Gcc
-from ferrite.components.utils import TreeModInfo
+from vortex.utils.path import TargetPath
+from vortex.utils.run import capture, run
+from vortex.tasks.base import task, Component, Context
+from vortex.tasks.compiler import Target, Gcc
+from vortex.tasks.utils import TreeModInfo
 
 import logging
 
@@ -16,10 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 def epics_host_arch(epics_base_dir: Path) -> str:
-    return capture([
-        "perl",
-        epics_base_dir / "src" / "tools" / "EpicsHostArch.pl",
-    ])
+    return capture(
+        [
+            "perl",
+            epics_base_dir / "src" / "tools" / "EpicsHostArch.pl",
+        ]
+    )
 
 
 def epics_arch_by_target(target: Target) -> str:
@@ -35,7 +37,6 @@ def epics_arch_by_target(target: Target) -> str:
 
 
 class EpicsProject(Component):
-
     def __init__(
         self,
         src_dir: Path | TargetPath,

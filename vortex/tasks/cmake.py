@@ -4,15 +4,14 @@ from typing import Dict, List, Optional
 from pathlib import Path
 from dataclasses import dataclass
 
-from ferrite.utils.path import TargetPath
-from ferrite.utils.run import run
-from ferrite.components.base import task, Component, Context
-from ferrite.components.compiler import Gcc
+from vortex.utils.path import TargetPath
+from vortex.utils.run import run
+from vortex.tasks.base import task, Component, Context
+from vortex.tasks.compiler import Gcc
 
 
 @dataclass
 class Cmake(Component):
-
     src_dir: Path | TargetPath
     build_dir: TargetPath
     cc: Gcc
@@ -62,7 +61,6 @@ class Cmake(Component):
 
 @dataclass
 class CmakeRunnable(Cmake):
-
     @task
     def run(self, ctx: Context) -> None:
         self.build(ctx)

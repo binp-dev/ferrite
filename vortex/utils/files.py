@@ -21,7 +21,7 @@ def substitute(
 
     logger.debug(f"substituting '{src}' -> '{dst}':")
 
-    with open(src, 'r') as file:
+    with open(src, "r") as file:
         data = file.read()
 
     new_data = data
@@ -30,14 +30,13 @@ def substitute(
 
     if force or new_data != data:
         logger.debug(f"writing file '{dst}'")
-        with open(dst, 'w') as file:
+        with open(dst, "w") as file:
             file.write(new_data)
     else:
         logger.debug(f"file unchanged '{dst}'")
 
 
 def _inverse_ignore_patterns(ignore_patterns: Callable[[str, List[str]], Set[str]]) -> Callable[[str, List[str]], Set[str]]:
-
     def allow_patterns(path: str, names: List[str]) -> Set[str]:
         return set(names) - set(ignore_patterns(path, names))
 

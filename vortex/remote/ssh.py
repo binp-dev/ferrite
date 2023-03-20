@@ -8,9 +8,9 @@ from pathlib import Path, PurePosixPath
 from paramiko import SSHClient
 from paramiko.channel import ChannelFile
 
-from ferrite.utils.run import run, RunError
-from ferrite.utils.strings import quote
-from ferrite.remote.base import Connection, Device
+from vortex.utils.run import run, RunError
+from vortex.utils.strings import quote
+from vortex.remote.base import Connection, Device
 
 import logging
 
@@ -28,7 +28,6 @@ def _split_addr(addr: str) -> Tuple[str, int]:
 
 
 class _ParamikoConnection(Connection):
-
     def __init__(self, client: SSHClient, channels: List[ChannelFile]) -> None:
         self.client = client
         self.channels = channels
@@ -38,7 +37,6 @@ class _ParamikoConnection(Connection):
 
 
 class SshConnection(Connection):
-
     def __init__(self, proc: Popen[bytes]) -> None:
         self.proc = proc
 
@@ -47,7 +45,6 @@ class SshConnection(Connection):
 
 
 class SshDevice(Device):
-
     def __init__(self, host: str, port: Optional[int] = None, user: str = "root"):
         super().__init__()
 
@@ -64,16 +61,18 @@ class SshDevice(Device):
             assert len(exclude) == 0, "'exclude' is not supported"
             run(["bash", "-c", f"test -f {src} && cat {src} | ssh -p {self.port} {self.user}@{self.host} 'cat > {dst}'"])
         else:
-            run([
-                "rsync",
-                "-rlpt",
-                *["--exclude=" + mask.replace('*', '**') for mask in exclude],
-                "--progress",
-                "--rsh",
-                f"ssh -p {self.port}",
-                f"{src}/",
-                f"{self.user}@{self.host}:{dst}",
-            ])
+            run(
+                [
+                    "rsync",
+                    "-rlpt",
+                    *["--exclude=" + mask.replace("*", "**") for mask in exclude],
+                    "--progress",
+                    "--rsh",
+                    f"ssh -p {self.port}",
+                    f"{src}/",
+                    f"{self.user}@{self.host}:{dst}",
+                ]
+            )
 
     def store_mem(self, src_data: str, dst_path: PurePosixPath) -> None:
         logger.debug(f"Store {len(src_data)} chars to {self.name()}:{dst_path}")

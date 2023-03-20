@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from colorama import init as colorama_init, Fore, Style
 
-from ferrite.components.base import Context, Task, Component
-from ferrite.utils.log import LogLevel
-from ferrite.runner import run
-from ferrite.remote.ssh import SshDevice
+from vortex.tasks.base import Context, Task, Component
+from vortex.utils.log import LogLevel
+from vortex.tasks.base import Runner
+from vortex.remote.ssh import SshDevice
 
 import logging
 
@@ -45,10 +45,12 @@ def _make_task_tree(tasks: List[str]) -> List[str]:
 
 
 def _available_tasks_text(comp: Component) -> str:
-    return "\n".join([
-        "Available tasks:",
-        *[(" " * 2) + task for task in _make_task_tree(list(comp.tasks().keys()))],
-    ])
+    return "\n".join(
+        [
+            "Available tasks:",
+            *[(" " * 2) + task for task in _make_task_tree(list(comp.tasks().keys()))],
+        ]
+    )
 
 
 def add_parser_args(parser: argparse.ArgumentParser, comp: Component) -> None:
@@ -58,17 +60,19 @@ def add_parser_args(parser: argparse.ArgumentParser, comp: Component) -> None:
         "task",
         type=str,
         metavar="<task>",
-        help="\n".join([
-            "Task you want to run.",
-            _available_tasks_text(comp),
-        ]),
+        help="\n".join(
+            [
+                "Task you want to run.",
+                _available_tasks_text(comp),
+            ]
+        ),
     )
     parser.add_argument(
         "-t",
         "--target-dir",
         type=str,
-        default="target",
-        help="Path to directory to place build artifacts. ('$PWD/target' by default)",
+        default=None,
+        help="Path to directory to place build artifacts. ('<base-dir>/target' by default)",
     )
     parser.add_argument(
         "--no-deps",
@@ -80,13 +84,15 @@ def add_parser_args(parser: argparse.ArgumentParser, comp: Component) -> None:
         type=str,
         metavar="<address>[:port]",
         default=None,
-        help="\n".join([
-            "Device to deploy and run tests.",
-            "Requirements:",
-            "+ Debian Linux running on the device (another distros are not tested).",
-            "+ SSH server running on the device on the specified port (or 22 if the port is not specified).",
-            "+ Possibility to log in to the device via SSH by user 'root' without password (e.g. using public key).",
-        ])
+        help="\n".join(
+            [
+                "Device to deploy and run tests.",
+                "Requirements:",
+                "+ Debian Linux running on the device (another distros are not tested).",
+                "+ SSH server running on the device on the specified port (or 22 if the port is not specified).",
+                "+ Possibility to log in to the device via SSH by user 'root' without password (e.g. using public key).",
+            ]
+        ),
     )
     parser.add_argument(
         "--update",
@@ -111,15 +117,17 @@ def add_parser_args(parser: argparse.ArgumentParser, comp: Component) -> None:
         type=int,
         choices=[int(v) for v in LogLevel],
         default=None,
-        help="\n".join([
-            "Set log level.",
-            "  0 - Trace",
-            "  1 - Debug",
-            "  2 - Info",
-            "  3 - Warning (since this level task output is captured and displayed only in case of error)",
-            "  4 - Error",
-            "Default value is 3 (warning).",
-        ]),
+        help="\n".join(
+            [
+                "Set log level.",
+                "  0 - Trace",
+                "  1 - Debug",
+                "  2 - Info",
+                "  3 - Warning (since this level task output is captured and displayed only in case of error)",
+                "  4 - Error",
+                "Default value is 3 (warning).",
+            ]
+        ),
     )
     parser.add_argument(
         "--no-capture",
@@ -149,8 +157,11 @@ def _find_task_by_args(comp: Component, args: argparse.Namespace) -> Task:
     return task
 
 
-def _make_context_from_args(args: argparse.Namespace) -> Context:
-    target_dir = Path(args.target_dir).resolve()
+def _make_context_from_args(args: argparse.Namespace, base_dir: Path) -> Context:
+    if args.target_dir is not None:
+        target_dir = Path(args.target_dir).resolve()
+    else:
+        target_dir = base_dir / "target"
 
     if args.device:
         device = SshDevice(args.device)
@@ -172,24 +183,20 @@ def _make_context_from_args(args: argparse.Namespace) -> Context:
     )
 
 
-def read_run_params(args: argparse.Namespace, comp: Component) -> RunParams:
+def read_run_params(args: argparse.Namespace, comp: Component, base_dir: Path) -> RunParams:
     try:
         task = _find_task_by_args(comp, args)
     except ReadRunParamsError as e:
         print(e)
         exit(1)
 
-    context = _make_context_from_args(args)
+    context = _make_context_from_args(args, base_dir)
 
     return RunParams(task, context, no_deps=args.no_deps)
 
 
-def _prepare_for_run(params: RunParams) -> None:
-    colorama_init()
-
-
-def setup_logging(params: RunParams, modules: List[str] = ["ferrite"]) -> None:
-    logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.WARNING, force=True)
+def setup_logging(params: RunParams, modules: List[str]) -> None:
+    logging.basicConfig(format="[%(levelname)s] %(message)s", level=logging.WARNING, force=True)
     if not params.context.capture:
         level = params.context.log_level.level()
         for mod in modules:
@@ -197,5 +204,4 @@ def setup_logging(params: RunParams, modules: List[str] = ["ferrite"]) -> None:
 
 
 def run_with_params(params: RunParams) -> None:
-    _prepare_for_run(params)
-    run(params.task, params.context, no_deps=params.no_deps)
+    Runner(params.task).run(params.context, no_deps=params.no_deps)

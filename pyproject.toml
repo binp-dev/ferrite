@@ -1,17 +1,9 @@
 [tool.poetry]
-name = "magnetite"
+name = "vortex"
 version = "0.1.0"
 description = "Tool to put different build systems together"
 authors = ["Alexey Gerasev <alexey.gerasev@gmail.com>"]
 license = "MIT"
-
-[[tool.poetry.packages]]
-include = "magnetite"
-from = "base"
-
-[[tool.poetry.packages]]
-include = "magnetite-epics"
-from = "epics"
 
 [tool.poetry.dependencies]
 python = "^3.9"

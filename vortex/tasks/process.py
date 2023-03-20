@@ -7,7 +7,7 @@ from pathlib import Path
 from time import sleep
 from enum import Enum
 
-from ferrite.components.base import Context
+from vortex.tasks.base import Context
 
 import logging
 
@@ -27,7 +27,6 @@ def run(
     env: Mapping[str, Path | str] = {},
     mode: RunMode = RunMode.NORMAL,
 ) -> None:
-
     if not ctx._running:
         return
 

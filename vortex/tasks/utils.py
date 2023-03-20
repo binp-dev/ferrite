@@ -51,11 +51,13 @@ def tree_mod_time(path: Path) -> float:
 
         max_time = 0.0
         for dirpath, dirnames, filenames in os.walk(path):
-            max_time = max([
-                max_time,
-                os.path.getmtime(dirpath),
-                *[os.path.getmtime(os.path.join(dirpath, fn)) for fn in filenames],
-            ])
+            max_time = max(
+                [
+                    max_time,
+                    os.path.getmtime(dirpath),
+                    *[os.path.getmtime(os.path.join(dirpath, fn)) for fn in filenames],
+                ]
+            )
         return max_time
     else:
         return os.path.getmtime(path)

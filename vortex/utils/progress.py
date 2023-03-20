@@ -61,7 +61,7 @@ class DownloadBar(ProgressBar):
         return (value, power)
 
     @classmethod
-    def _human_readable(cls, value: float, suffix: str = 'B') -> str:
+    def _human_readable(cls, value: float, suffix: str = "B") -> str:
         value, power = cls._units(value)
         return f"{value:6.1f} {cls.PREFIXES[power]}{suffix}"
 

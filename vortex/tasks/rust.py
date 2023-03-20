@@ -5,11 +5,11 @@ import re
 from pathlib import Path
 from dataclasses import dataclass, field
 
-from ferrite.utils.path import TargetPath
-from ferrite.utils.run import run, capture
-from ferrite.components.base import task, Component, Context
-from ferrite.components.compiler import Compiler, Gcc, GccCross, GccHost, Target
-from ferrite.components.process import run as run_with_ctx
+from vortex.utils.path import TargetPath
+from vortex.utils.run import run, capture
+from vortex.tasks.base import task, Component, Context
+from vortex.tasks.compiler import Compiler, Gcc, GccCross, GccHost, Target
+from vortex.tasks.process import run as run_with_ctx
 
 import logging
 
@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class Rustc(Compiler):
-
     def __init__(self, postfix: str, target: Target, cc: Gcc, toolchain: Optional[str] = None):
         super().__init__(f"rustc_{postfix}", target)
         self.path = TargetPath("rustup")
@@ -44,7 +43,6 @@ class Rustc(Compiler):
 
 
 class RustcHost(Rustc):
-
     _target_pattern: re.Pattern[str] = re.compile(r"^Default host:\s+(\S+)$", re.MULTILINE)
 
     def __init__(self, cc: GccHost, toolchain: Optional[str] = None):
@@ -56,7 +54,6 @@ class RustcHost(Rustc):
 
 
 class RustcCross(Rustc):
-
     def __init__(self, postfix: str, target: Target, cc: GccCross, toolchain: Optional[str] = None):
         super().__init__(postfix, target, cc, toolchain=toolchain)
 
@@ -129,8 +126,8 @@ class Cargo(Component):
                 "test",
                 *([f"--features={','.join(self.features)}"] if len(self.features) > 0 else []),
                 *(["--no-default-features"] if not self.default_features else []),
-                #"--",
-                #"--nocapture",
+                # "--",
+                # "--nocapture",
             ],
             cwd=self.src_path(ctx),
             add_env=self.env(ctx),

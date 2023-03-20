@@ -4,12 +4,12 @@ from typing import List, TypeVar
 import shutil
 from pathlib import Path, PurePosixPath
 
-from ferrite.utils.path import TargetPath
-from ferrite.utils.files import substitute, allow_patterns
-from ferrite.components.base import task, Context
-from ferrite.components.git import RepoList, RepoSource
-from ferrite.components.compiler import Gcc, GccHost, GccCross
-from ferrite.components.epics.base import EpicsProject
+from vortex.utils.path import TargetPath
+from vortex.utils.files import substitute, allow_patterns
+from vortex.tasks.base import task, Context
+from vortex.tasks.git import RepoList, RepoSource
+from vortex.tasks.compiler import Gcc, GccHost, GccCross
+from vortex.tasks.epics.base import EpicsProject
 
 import logging
 
@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractEpicsBase(EpicsProject):
-
     def __init__(self, src_dir: Path | TargetPath, target_dir: TargetPath, cc: Gcc, blacklist: List[str] = []) -> None:
         super().__init__(
             src_dir,
@@ -33,8 +32,8 @@ class AbstractEpicsBase(EpicsProject):
 
     def _configure_common(self, ctx: Context) -> None:
         defs = [
-            #("USR_CFLAGS", ""),
-            #("USR_CPPFLAGS", ""),
+            # ("USR_CFLAGS", ""),
+            # ("USR_CPPFLAGS", ""),
             ("USR_CXXFLAGS", "-std=c++20"),
             ("BIN_PERMISSIONS", "755"),
             ("LIB_PERMISSIONS", "644"),
@@ -52,14 +51,17 @@ class AbstractEpicsBase(EpicsProject):
         raise NotImplementedError()
 
     def _configure_install(self, ctx: Context) -> None:
-        substitute([
-            ("^\\s*#*(\\s*INSTALL_LOCATION\\s*=).*$", f"\\1 {ctx.target_path / self.install_dir}"),
-        ], ctx.target_path / self.build_dir / "configure/CONFIG_SITE")
+        substitute(
+            [
+                ("^\\s*#*(\\s*INSTALL_LOCATION\\s*=).*$", f"\\1 {ctx.target_path / self.install_dir}"),
+            ],
+            ctx.target_path / self.build_dir / "configure/CONFIG_SITE",
+        )
 
     def _configure(self, ctx: Context) -> None:
         self._configure_common(ctx)
         self._configure_toolchain(ctx)
-        #self._configure_install(ctx) # Install is broken
+        # self._configure_install(ctx) # Install is broken
 
     @task
     def build(self, ctx: Context) -> None:
@@ -71,13 +73,13 @@ class AbstractEpicsBase(EpicsProject):
         paths = [
             "bin",
             "cfg",
-            #"configure",
+            # "configure",
             "db",
             "dbd",
-            #"html",
+            # "html",
             "include",
             "lib",
-            #"templates",
+            # "templates",
         ]
         for path in paths:
             shutil.rmtree(
@@ -98,9 +100,7 @@ class AbstractEpicsBase(EpicsProject):
 
 
 class EpicsBaseHost(AbstractEpicsBase):
-
     def __init__(self, cc: GccHost):
-
         self.version = "7.0.6.1"
         name = f"epics_base_{self.version}"
 
@@ -130,7 +130,6 @@ class EpicsBaseHost(AbstractEpicsBase):
 
 
 class EpicsBaseCross(AbstractEpicsBase):
-
     def __init__(self, cc: GccCross, host_base: EpicsBaseHost):
         super().__init__(
             host_base.build_dir,
@@ -148,7 +147,7 @@ class EpicsBaseCross(AbstractEpicsBase):
         assert cross_arch != host_arch
 
         if cross_arch == "linux-arm" and host_arch.endswith("-x86_64"):
-            host_arch = host_arch[:-3] # Trim '_64'
+            host_arch = host_arch[:-3]  # Trim '_64'
 
         substitute(
             [("^(\\s*CROSS_COMPILER_TARGET_ARCHS\\s*=).*$", f"\\1 {cross_arch}")],

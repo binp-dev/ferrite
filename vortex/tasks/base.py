@@ -1,12 +1,15 @@
 from __future__ import annotations
-from typing import Callable, TypeVar, Any, Dict, overload, Optional, ContextManager, Set, List
+from typing import Callable, TypeVar, Any, Dict, overload, Optional, ContextManager, Set, List, Generator
 
 from pathlib import Path
 from dataclasses import dataclass, field
 from inspect import signature, Parameter
+from contextlib import contextmanager
 
-from ferrite.utils.log import LogLevel
-from ferrite.remote.base import Device
+from vortex.utils.log import LogLevel
+from vortex.remote.base import Device
+
+from colorama import init as colorama_init, Fore, Style
 
 
 @dataclass
@@ -30,7 +33,6 @@ class Context:
 
 
 class Task:
-
     def name(self) -> str:
         raise NotImplementedError()
 
@@ -60,7 +62,6 @@ class Task:
 
 
 class Component:
-
     def tasks(self) -> Dict[str, Task]:
         names: Dict[Task, str] = {}
         for name, task in {k: getattr(self, k) for k in dir(self)}.items():
@@ -71,6 +72,38 @@ class Component:
                 task = unb_task.__get__(self)
                 names[task] = name
         return {v: k for k, v in names.items()}
+
+
+@dataclass
+class Runner:
+    task: Task
+
+    def __post_init__(self) -> None:
+        colorama_init()
+
+    @staticmethod
+    @contextmanager
+    def _with_info(task: Task, ctx: Context) -> Generator[None, None, None]:
+        tab = " " * len(set(ctx._stack))
+        print(f"{tab}{Style.BRIGHT + Fore.WHITE}{task.name()}{Style.NORMAL} started ...{Style.RESET_ALL}")
+        try:
+            yield
+        except:
+            print(f"{tab}{Style.BRIGHT + Fore.RED}{task.name()}{Style.NORMAL} FAILED:{Style.RESET_ALL}")
+            raise
+        else:
+            print(f"{tab}{Style.BRIGHT + Fore.GREEN}{task.name()}{Style.NORMAL} done{Style.RESET_ALL}")
+
+    def run(self, ctx: Context, no_deps: bool = False) -> None:
+        ctx.target_path.mkdir(exist_ok=True)
+
+        ctx._running = True
+        ctx._stack = []
+        ctx._visited = set()
+        ctx._guard = Runner._with_info
+        ctx._no_deps = no_deps
+
+        (self.task)(ctx)
 
 
 T = TypeVar("T", bound=Component, contravariant=True)
@@ -194,7 +227,6 @@ def empty(ctx: Context) -> None:
 
 
 class TaskList(Task):
-
     def __init__(self, *tasks: Task) -> None:
         self.tasks = tasks
 
@@ -209,7 +241,6 @@ class TaskList(Task):
 
 
 class DictComponent(Component):
-
     def __init__(self, **tasks: Task) -> None:
         self._tasks = tasks
 
@@ -218,7 +249,6 @@ class DictComponent(Component):
 
 
 class ComponentGroup(Component):
-
     def components(self) -> Dict[str, Component]:
         raise NotImplementedError()
 

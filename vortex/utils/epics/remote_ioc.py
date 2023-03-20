@@ -4,7 +4,7 @@ from typing import Any, Optional
 import time
 from pathlib import PurePosixPath
 
-from ferrite.remote.base import Device, Connection
+from vortex.remote.base import Device, Connection
 
 import logging
 
@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class IocRemoteRunner:
-
     def __init__(
         self,
         device: Device,

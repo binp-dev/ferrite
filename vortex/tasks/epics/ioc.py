@@ -6,17 +6,16 @@ import re
 import time
 from pathlib import Path, PurePosixPath
 
-from ferrite.utils.path import TargetPath
-from ferrite.utils.files import substitute
-from ferrite.components.base import task, Context
-from ferrite.components.epics.base import EpicsProject
-from ferrite.components.epics.epics_base import AbstractEpicsBase, EpicsBaseCross, EpicsBaseHost
-from ferrite.components.process import run
-from ferrite.utils.epics.ioc_remote import IocRemoteRunner
+from vortex.utils.path import TargetPath
+from vortex.utils.files import substitute
+from vortex.tasks.base import task, Context
+from vortex.tasks.epics.base import EpicsProject
+from vortex.tasks.epics.epics_base import AbstractEpicsBase, EpicsBaseCross, EpicsBaseHost
+from vortex.tasks.process import run
+from vortex.utils.epics.remote_ioc import IocRemoteRunner
 
 
 class AbstractIoc(EpicsProject):
-
     def __init__(self, ioc_dir: Path, target_dir: TargetPath, epics_base: AbstractEpicsBase, **kws: Any):
         super().__init__(ioc_dir, target_dir, epics_base.cc, deploy_path=PurePosixPath("/opt/ioc"))
         self.epics_base = epics_base
@@ -76,7 +75,6 @@ class AbstractIoc(EpicsProject):
 
 
 class IocHost(AbstractIoc):
-
     def __init__(self, ioc_dir: Path, target_dir: TargetPath, epics_base: EpicsBaseHost):
         super().__init__(ioc_dir, target_dir, epics_base)
 
@@ -95,10 +93,14 @@ class IocHost(AbstractIoc):
         cwd = script.parent
         lib_dirs = [epics_base_dir / "lib" / arch, ioc_dir / "lib" / arch]
         env = {
-            **({
-                "EPICS_CA_AUTO_ADDR_LIST": "NO",
-                "EPICS_CA_ADDR_LIST": ",".join(addr_list),
-            } if len(addr_list) > 0 else {}),
+            **(
+                {
+                    "EPICS_CA_AUTO_ADDR_LIST": "NO",
+                    "EPICS_CA_ADDR_LIST": ",".join(addr_list),
+                }
+                if len(addr_list) > 0
+                else {}
+            ),
             "LD_LIBRARY_PATH": ":".join([str(p) for p in lib_dirs]),
         }
 
@@ -106,7 +108,6 @@ class IocHost(AbstractIoc):
 
 
 class IocCross(AbstractIoc):
-
     def __init__(self, ioc_dir: Path, target_dir: TargetPath, epics_base: EpicsBaseCross):
         super().__init__(ioc_dir, target_dir, epics_base)
         self.epics_deploy_path = epics_base.deploy_path

@@ -5,10 +5,10 @@ import shutil
 from pathlib import Path, PurePosixPath
 from dataclasses import dataclass
 
-from ferrite.utils.path import TargetPath
-from ferrite.utils.run import capture
-from ferrite.utils.net import download_alt
-from ferrite.components.base import task, Component, Context
+from vortex.utils.path import TargetPath
+from vortex.utils.run import capture
+from vortex.utils.net import download_alt
+from vortex.tasks.base import task, Component, Context
 
 import logging
 
@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class Target:
-
     @overload
     def __init__(self, isa: str, api: str, abi: str, /) -> None:
         ...
@@ -39,17 +38,18 @@ class Target:
         return Target(*target.split("-"))
 
     def __str__(self) -> str:
-        return "-".join([
-            self.isa,
-            *([self.vendor] if self.vendor is not None else []),
-            self.api,
-            self.abi,
-        ])
+        return "-".join(
+            [
+                self.isa,
+                *([self.vendor] if self.vendor is not None else []),
+                self.api,
+                self.abi,
+            ]
+        )
 
 
 @dataclass
 class Compiler(Component):
-
     name: str
     target: Target
 
@@ -64,7 +64,6 @@ class Compiler(Component):
 
 @dataclass
 class Gcc(Compiler):
-
     @property
     def path(self) -> Path | TargetPath:
         raise NotImplementedError()
@@ -74,7 +73,6 @@ class Gcc(Compiler):
 
 
 class GccHost(Gcc):
-
     def __init__(self) -> None:
         super().__init__("host", Target.from_str(capture(["gcc", "-dumpmachine"])))
 
@@ -87,7 +85,6 @@ class GccHost(Gcc):
 
 
 class GccCross(Gcc):
-
     def __init__(self, name: str, target: Target, dir_name: str, archive: str, urls: List[str]):
         super().__init__(name, target)
 

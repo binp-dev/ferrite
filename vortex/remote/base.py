@@ -6,13 +6,11 @@ from subprocess import Popen
 
 
 class Connection:
-
     def close(self) -> None:
         raise NotImplementedError()
 
 
 class Device:
-
     def name(self) -> str:
         raise NotImplementedError()
 

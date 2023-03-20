@@ -7,7 +7,6 @@ Self = TypeVar("Self")
 
 
 class PathLike(Protocol):
-
     def __truediv__(self: Self, rhs: str | PurePath) -> Self:
         ...
 

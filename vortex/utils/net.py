@@ -5,7 +5,7 @@ from pathlib import Path
 from urllib.request import urlretrieve
 from urllib.error import HTTPError, URLError
 
-from ferrite.utils.progress import DownloadBar
+from vortex.utils.progress import DownloadBar
 
 import logging
 
