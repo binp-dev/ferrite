@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "vortex"
 version = "0.1.0"
-description = "Tool to put different build systems together"
+description = "Heterogenous build automation tool"
 authors = ["Alexey Gerasev <alexey.gerasev@gmail.com>"]
 license = "MIT"
 

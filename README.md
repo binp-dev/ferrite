@@ -1,87 +1,21 @@
-# Ferrite
+# Vortex
 
-Framework for embedded heterogenous devices software development.
+Heterogenous build automation tool.
 
-## About
+## Supported tools
 
-### Use cases
+### Toolchains
 
-+ Software development for specific hardware:
-  + Real-time (code for MCU: bare-metal or with FreeRTOS).
-  + Application (general-purpose code to run under Linux).
-  + Control system interface to hardware (EPICS IOC (DeviceSupport)).
-+ Establishing a communication between previous components.
-+ Automation of building, testing and deployment processes.
++ GCC
++ Rustup
 
-### Supported platforms
+### Build systems
 
-+ NXP/Freescale i.MX7 *(deprecated)*
-+ NXP/Freescale i.MX8M Nano
++ Cmake
++ Cargo
++ [EPICS](https://epics-controls.org/) makefiles
 
-### Supported control systems
+### Others
 
-+ [EPICS](https://epics-controls.org/)
-
-## Usage
-
-To use the framework you need:
-
-1. Include Ferrite to your project as submodule.
-2. Specify your project components derived from Ferrite component templates.
-3. Add `manage` script to your project.
-
-You may look at `example` directory for usage example.
-
-Framework contains libraries you may use in derived projects:
-
-+ C - for real-time code (including HAL).
-+ Rust - for application code.
-+ Python - for processes automation and CI integration.
-
-## Usage
-
-### Requirements
-
-#### Linux packages
-
-+ `cmake`
-+ `python3`
-+ `perl`
-
-#### Python packages
-
-+ `poetry`
-
-#### [Rustup](https://rustup.rs/)
-
-### Tests
-
-These commands will install dependencies, build software and run all tests:
-
-```bash
-cd <path-to-ferrite>
-poetry install
-poetry run python -m pytest
-poetry run python -m ferrite.manage all.test
-```
-
-### Example
-
-Go to example directory:
-
-```bash
-cd example/
-poetry install
-```
-
-To build example for host and run tests:
-
-```bash
-poetry run python -m example.manage host.all.test
-```
-
-For cross-builing (e.g. for aarch64) run:
-
-```bash
-poetry run python -m example.manage aarch64.all.build
-```
++ Git
++ SSH

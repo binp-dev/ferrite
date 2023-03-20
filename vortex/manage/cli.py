@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List, Optional
+from typing import Dict, List, Tuple
 
 import argparse
 from dataclasses import dataclass
@@ -16,27 +16,30 @@ import logging
 
 def _make_task_tree(tasks: List[str]) -> List[str]:
     output: List[str] = []
-    groups: Dict[str, List[str] | None] = {}
+    groups: Dict[str, List[str]] = {}
     for task in tasks:
         spl = task.split(".", 1)
         if len(spl) == 1:
             key = spl[0]
             assert key not in groups
-            groups[key] = None
+            groups[key] = []
         elif len(spl) == 2:
             key, value = spl
             if key in groups:
                 values = groups[key]
-                assert values is not None
+                assert values is not []
                 values.append(value)
             else:
                 groups[key] = [value]
 
-    for key, values in sorted(groups.items(), key=lambda x: x[0]):
-        if values is None:
+    def sort_key(x: Tuple[str, List[str]]) -> Tuple[int, Tuple[str, ...]]:
+        p = (x[0], *x[1])
+        return (len(p), p)
+
+    for key, values in sorted(groups.items(), key=sort_key):
+        if len(values) == 0:
             output.append(f"{Style.BRIGHT}{key}{Style.NORMAL}")
         else:
-            assert len(values) > 0
             subtree = _make_task_tree(values)
             output.append(f"{Style.BRIGHT}{key}.{subtree[0]}{Style.NORMAL}")
             output.extend([f"{Style.DIM}{key}.{Style.NORMAL}{value}" for value in subtree[1:]])
@@ -130,11 +133,6 @@ def add_parser_args(parser: argparse.ArgumentParser, comp: Component) -> None:
                 "Default value is 3 (warning).",
             ]
         ),
-    )
-    parser.add_argument(
-        "--no-capture",
-        action="store_true",
-        help="[DEPRECATED] The same as `--verbosilty=2`.",
     )
 
 
