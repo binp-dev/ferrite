@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from colorama import init as colorama_init, Fore, Style
+from colorama import init as colorama_init, Style
 
 from vortex.tasks.base import Context, Task, Component
 from vortex.utils.log import LogLevel
@@ -54,6 +54,8 @@ def _available_tasks_text(comp: Component) -> str:
 
 
 def add_parser_args(parser: argparse.ArgumentParser, comp: Component) -> None:
+    colorama_init()
+
     parser.formatter_class = argparse.RawTextHelpFormatter
 
     parser.add_argument(
@@ -72,7 +74,7 @@ def add_parser_args(parser: argparse.ArgumentParser, comp: Component) -> None:
         "--target-dir",
         type=str,
         default=None,
-        help="Path to directory to place build artifacts. ('<base-dir>/target' by default)",
+        help="Path to directory to place build artifacts.",
     )
     parser.add_argument(
         "--no-deps",
@@ -157,11 +159,9 @@ def _find_task_by_args(comp: Component, args: argparse.Namespace) -> Task:
     return task
 
 
-def _make_context_from_args(args: argparse.Namespace, base_dir: Path) -> Context:
+def _make_context_from_args(args: argparse.Namespace, target_dir: Path) -> Context:
     if args.target_dir is not None:
         target_dir = Path(args.target_dir).resolve()
-    else:
-        target_dir = base_dir / "target"
 
     if args.device:
         device = SshDevice(args.device)
@@ -183,14 +183,14 @@ def _make_context_from_args(args: argparse.Namespace, base_dir: Path) -> Context
     )
 
 
-def read_run_params(args: argparse.Namespace, comp: Component, base_dir: Path) -> RunParams:
+def read_run_params(args: argparse.Namespace, comp: Component, target_dir: Path) -> RunParams:
     try:
         task = _find_task_by_args(comp, args)
     except ReadRunParamsError as e:
         print(e)
         exit(1)
 
-    context = _make_context_from_args(args, base_dir)
+    context = _make_context_from_args(args, target_dir)
 
     return RunParams(task, context, no_deps=args.no_deps)
 

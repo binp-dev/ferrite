@@ -250,7 +250,7 @@ class DictComponent(Component):
 
 class ComponentGroup(Component):
     def components(self) -> Dict[str, Component]:
-        raise NotImplementedError()
+        return {k: v for k, v in self.__dict__.items() if isinstance(v, Component)}
 
     def tasks(self) -> Dict[str, Task]:
         tasks: Dict[str, Task] = {}
@@ -259,4 +259,13 @@ class ComponentGroup(Component):
                 key = f"{comp_name}.{task_name}"
                 assert key not in tasks
                 tasks[key] = task
+        tasks.update(super().tasks())
         return tasks
+
+
+class DictGroup(ComponentGroup):
+    def __init__(self, **comps: Component) -> None:
+        self._comps = comps
+
+    def components(self) -> Dict[str, Component]:
+        return self._comps

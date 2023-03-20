@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Sequence, Mapping, List, Optional
+from typing import Sequence, Mapping, Optional
 
 import os
 from subprocess import Popen, CalledProcessError

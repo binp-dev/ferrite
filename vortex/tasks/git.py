@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import shutil
 from pathlib import Path
@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from vortex.utils.path import TargetPath
 from vortex.utils.run import run, RunError
-from vortex.tasks.base import task, Component, Task, Context
+from vortex.tasks.base import task, Component, Context
 
 import logging
 

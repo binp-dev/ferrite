@@ -23,11 +23,7 @@ class AbstractEpicsBase(EpicsProject):
             target_dir,
             cc,
             deploy_path=PurePosixPath("/opt/epics_base"),
-            blacklist=[
-                "*.a",
-                "include/*",
-                *blacklist,
-            ],
+            blacklist=["*.a", "include/*", *blacklist],
         )
 
     def _configure_common(self, ctx: Context) -> None:

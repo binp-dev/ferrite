@@ -16,12 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def epics_host_arch(epics_base_dir: Path) -> str:
-    return capture(
-        [
-            "perl",
-            epics_base_dir / "src" / "tools" / "EpicsHostArch.pl",
-        ]
-    )
+    return capture(["perl", epics_base_dir / "src" / "tools" / "EpicsHostArch.pl"])
 
 
 def epics_arch_by_target(target: Target) -> str:
@@ -141,10 +136,5 @@ class EpicsProject(Component):
         assert ctx.device is not None
         self._pre_deploy(ctx)
         logger.info(f"Deploy {install_path} to {ctx.device.name()}:{self.deploy_path}")
-        ctx.device.store(
-            install_path,
-            self.deploy_path,
-            recursive=True,
-            exclude=self.blacklist,
-        )
+        ctx.device.store(install_path, self.deploy_path, recursive=True, exclude=self.blacklist)
         self._post_deploy(ctx)
